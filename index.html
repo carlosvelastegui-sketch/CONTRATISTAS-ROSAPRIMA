@@ -1149,18 +1149,19 @@ async function cargarDatosCloud(){
         prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio,precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
     });
     if(Array.isArray(facts)) facts.forEach(f=>{
-      // Update existing historical facturas with saved estado
-      const existing = facturas.find(x=>String(x.id)===String(f.id) && x.cliente===f.cliente);
-      if(existing){
-        // Update estado and payment info from cloud
-        existing.estado = f.estado||existing.estado;
-        existing.valorPagado = parseFloat(f.valorPagado)||existing.valorPagado||0;
-        existing.retencion = parseFloat(f.retencion)||existing.retencion||0;
-        existing.comprobante = f.comprobante||existing.comprobante||'';
-        existing.factura = f.factura||existing.factura||'';
-        existing.fechaPago = f.fechaPago||existing.fechaPago||'';
-      } else {
-        // Add new facturas not in historical
+      const fid = parseInt(f.npref||f.id||0);
+      // Update payment status on existing historical facturas
+      const existing = facturas.find(x=>
+        x.factura && f.factura && x.factura===String(f.factura)
+      );
+      if(existing && f.estado==='pagado'){
+        existing.estado='pagado';
+        existing.valorPagado=parseFloat(f.valorPagado)||0;
+        existing.retencion=parseFloat(f.retencion)||0;
+        existing.comprobante=f.comprobante||'';
+        existing.fechaPago=f.fechaPago||'';
+      } else if(!existing && fid>=52){
+        // Only add new facturas from app (id>=52), never historical
         facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago'});
       }
     });
