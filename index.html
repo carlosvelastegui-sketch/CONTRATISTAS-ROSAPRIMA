@@ -1061,6 +1061,53 @@ function getSaldo(n){
   return base + acr - con;
 }
 
+// ── localStorage para persistencia local ──────────────────
+function guardarLocalStorage(){
+  try {
+    // Solo guardar cambios nuevos (estados de facturas, nuevos consumos, prefacturas)
+    const estadosFacturas = {};
+    facturas.forEach(f=>{ estadosFacturas[f.id]={estado:f.estado,valorPagado:f.valorPagado,retencion:f.retencion,comprobante:f.comprobante,factura:f.factura,fechaPago:f.fechaPago}; });
+    localStorage.setItem('rosaprima_facturas_estados', JSON.stringify(estadosFacturas));
+    // Guardar nuevos consumos y prefacturas (id >= 52)
+    const newCons = consumos.filter(x=>x.id>=352);
+    const newPFs  = prefacturas.filter(x=>x.id>=52);
+    localStorage.setItem('rosaprima_new_consumos', JSON.stringify(newCons));
+    localStorage.setItem('rosaprima_new_prefacturas', JSON.stringify(newPFs));
+    console.log('✓ Guardado local');
+  } catch(e){ console.error('localStorage error:', e); }
+}
+
+function cargarLocalStorage(){
+  try {
+    // Restaurar estados de facturas
+    const est = localStorage.getItem('rosaprima_facturas_estados');
+    if(est){
+      const estados = JSON.parse(est);
+      facturas.forEach(f=>{
+        if(estados[f.id]){
+          Object.assign(f, estados[f.id]);
+        }
+      });
+      console.log('✓ Estados de facturas restaurados');
+    }
+    // Restaurar nuevos consumos
+    const newCons = localStorage.getItem('rosaprima_new_consumos');
+    if(newCons){
+      JSON.parse(newCons).forEach(x=>{
+        if(!consumos.find(c=>c.id===x.id)) consumos.push(x);
+      });
+    }
+    // Restaurar nuevas prefacturas
+    const newPFs = localStorage.getItem('rosaprima_new_prefacturas');
+    if(newPFs){
+      JSON.parse(newPFs).forEach(p=>{
+        if(!prefacturas.find(x=>x.id===p.id)) prefacturas.push(p);
+        if(!facturas.find(f=>f.npref===p.id)) agregarFacturaPendiente(p);
+      });
+    }
+  } catch(e){ console.error('cargarLocalStorage error:', e); }
+}
+
 // ── API Google Sheets (JSONP — sin CORS) ──────────────────
 const API_URL = "https://script.google.com/macros/s/AKfycbxnLzsGmKxH_ePCXAGjGQ6_Wvo4ACzgNwYJjuUsXnzc_f4zvnV4v7FfPG_Eq7amWtBh/exec";
 
@@ -1102,8 +1149,20 @@ async function cargarDatosCloud(){
         prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio,precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
     });
     if(Array.isArray(facts)) facts.forEach(f=>{
-      if(!facturas.find(x=>String(x.id)===String(f.id) && x.cliente===f.cliente))
+      // Update existing historical facturas with saved estado
+      const existing = facturas.find(x=>String(x.id)===String(f.id) && x.cliente===f.cliente);
+      if(existing){
+        // Update estado and payment info from cloud
+        existing.estado = f.estado||existing.estado;
+        existing.valorPagado = parseFloat(f.valorPagado)||existing.valorPagado||0;
+        existing.retencion = parseFloat(f.retencion)||existing.retencion||0;
+        existing.comprobante = f.comprobante||existing.comprobante||'';
+        existing.factura = f.factura||existing.factura||'';
+        existing.fechaPago = f.fechaPago||existing.fechaPago||'';
+      } else {
+        // Add new facturas not in historical
         facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago'});
+      }
     });
     renderDash();
     console.log('✓ Datos cargados desde la nube.');
@@ -1214,6 +1273,7 @@ function registrarConsumo(){
     const nc={id:nextCONid++,cliente:n,qty:l.qty,finca:l.finca,fecha,obs};
     consumos.push(nc);
     apiPost({action:'saveConsumo',...nc});
+    guardarLocalStorage();
   });
   mostrarSaldo();
   alert("✓ Consumo registrado\n"+n+"\nTotal: "+total+" almuerzos\nSaldo restante: "+getSaldo(n));
@@ -1290,6 +1350,7 @@ function confirmarPF(){
   agregarFacturaPendiente(curPF);
   apiPost({action:'savePreFact',...curPF});
   apiPost({action:'saveFactura',...facturas[facturas.length-1]});
+  guardarLocalStorage();
   nextPFid++;
   ["ppaso1","ppaso2","ppaso3"].forEach((p,i)=>document.getElementById(p).style.display=i===2?"":"none");
   document.getElementById("ps1").className="step done";
@@ -1375,7 +1436,8 @@ function guardarPago(){
   x.fechaPago=document.getElementById("mpago-fecha").value;
   x.obs=document.getElementById("mpago-obs").value.trim();
   x.estado="pagado";
-  apiPost({action:'registrarPago',id:x.id,valorPagado:x.valorPagado,retencion:x.retencion,comprobante:x.comprobante,factura:x.factura});
+  apiPost({action:'registrarPago',id:x.id,cliente:x.cliente,valorPagado:x.valorPagado,retencion:x.retencion,comprobante:x.comprobante,factura:x.factura,estado:'pagado'});
+  guardarLocalStorage();
   document.getElementById("modal-pago").classList.remove("open");
   renderControl();
   renderDash();
@@ -1693,7 +1755,10 @@ function guardarCli(){
 
 function cerrarModal(){document.getElementById("modal-cli").classList.remove("open");}
 
-poblar(); calcPF(); renderDash(); agregarLinea(); cargarDatosCloud();
+poblar(); calcPF(); agregarLinea();
+cargarLocalStorage();
+renderDash();
+cargarDatosCloud();
 </script>
 </body>
 </html>
