@@ -1165,6 +1165,7 @@ async function cargarDatosCloud(){
       }
     });
     renderDash();
+    renderControl();
     console.log('✓ Datos cargados desde la nube.');
   } catch(e) {
     console.error('Error cargando datos:', e);
@@ -1757,8 +1758,7 @@ function cerrarModal(){document.getElementById("modal-cli").classList.remove("op
 
 poblar(); calcPF(); agregarLinea();
 cargarLocalStorage();
-renderDash();
-cargarDatosCloud();
+cargarDatosCloud().then(function(){ renderDash(); renderControl(); });
 </script>
 </body>
 </html>
