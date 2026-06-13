@@ -164,7 +164,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="metric"><div class="metric-label">Contratistas activos</div><div class="metric-val blue" id="m-cli">0</div></div>
           <div class="metric"><div class="metric-label">Saldo positivo total</div><div class="metric-val green" id="m-saldo">0</div></div>
           <div class="metric"><div class="metric-label">Con saldo negativo</div><div class="metric-val red" id="m-neg">0</div></div>
-          <div class="metric" onclick="showTab("control",document.querySelector("[onclick*=\"control\"]"))" style="cursor:pointer;transition:box-shadow 0.2s" onmouseover="this.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"" onmouseout="this.style.boxShadow="""><div class="metric-label">Prefact. pendientes <i class="ti ti-arrow-right" style="font-size:10px"></i></div><div class="metric-val amber" id="m-pend">0</div></div>
+          <div class="metric" onclick="showTab("control",document.querySelector("[onclick*=\"control\"]"));setTimeout(function(){var f=document.getElementById("filtro-ctrl");if(f){f.value="pendiente_pago";renderControl();}},100);" style="cursor:pointer;transition:box-shadow 0.2s" onmouseover="this.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"" onmouseout="this.style.boxShadow="""><div class="metric-label">Prefact. pendientes <i class="ti ti-arrow-right" style="font-size:10px"></i></div><div class="metric-val amber" id="m-pend">0</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div class="card">
@@ -654,7 +654,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="metric"><div class="metric-label">Contratistas activos</div><div class="metric-val blue" id="m-cli">0</div></div>
           <div class="metric"><div class="metric-label">Saldo positivo total</div><div class="metric-val green" id="m-saldo">0</div></div>
           <div class="metric"><div class="metric-label">Con saldo negativo</div><div class="metric-val red" id="m-neg">0</div></div>
-          <div class="metric" onclick="showTab("control",document.querySelector("[onclick*=\"control\"]"))" style="cursor:pointer;transition:box-shadow 0.2s" onmouseover="this.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"" onmouseout="this.style.boxShadow="""><div class="metric-label">Prefact. pendientes <i class="ti ti-arrow-right" style="font-size:10px"></i></div><div class="metric-val amber" id="m-pend">0</div></div>
+          <div class="metric" onclick="showTab("control",document.querySelector("[onclick*=\"control\"]"));setTimeout(function(){var f=document.getElementById("filtro-ctrl");if(f){f.value="pendiente_pago";renderControl();}},100);" style="cursor:pointer;transition:box-shadow 0.2s" onmouseover="this.style.boxShadow="0 4px 16px rgba(0,0,0,0.12)"" onmouseout="this.style.boxShadow="""><div class="metric-label">Prefact. pendientes <i class="ti ti-arrow-right" style="font-size:10px"></i></div><div class="metric-val amber" id="m-pend">0</div></div>
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
           <div class="card">
