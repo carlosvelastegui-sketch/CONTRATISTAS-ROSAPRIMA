@@ -1077,32 +1077,45 @@ function guardarLocalStorage(){
   } catch(e){ console.error('localStorage error:', e); }
 }
 
+const APP_VERSION = '2026061301'; // Cambia esto para limpiar localStorage
 function cargarLocalStorage(){
   try {
-    // Restaurar estados de facturas
+    // Version check - clear old data if version changed
+    const savedVersion = localStorage.getItem('rosaprima_version');
+    if(savedVersion !== APP_VERSION){
+      localStorage.removeItem('rosaprima_facturas_estados');
+      localStorage.removeItem('rosaprima_new_consumos');
+      localStorage.removeItem('rosaprima_new_prefacturas');
+      localStorage.setItem('rosaprima_version', APP_VERSION);
+      console.log('✓ Cache limpiado por nueva versión');
+      return;
+    }
+    // Restaurar estados de facturas (solo pagado)
     const est = localStorage.getItem('rosaprima_facturas_estados');
     if(est){
       const estados = JSON.parse(est);
       facturas.forEach(f=>{
-        if(estados[f.id]){
+        if(estados[f.id] && estados[f.id].estado==='pagado'){
           Object.assign(f, estados[f.id]);
         }
       });
       console.log('✓ Estados de facturas restaurados');
     }
-    // Restaurar nuevos consumos
+    // Restaurar nuevos consumos (solo id >= 352)
     const newCons = localStorage.getItem('rosaprima_new_consumos');
     if(newCons){
       JSON.parse(newCons).forEach(x=>{
-        if(!consumos.find(c=>c.id===x.id)) consumos.push(x);
+        if(x.id>=352 && !consumos.find(c=>c.id===x.id)) consumos.push(x);
       });
     }
-    // Restaurar nuevas prefacturas
+    // Restaurar nuevas prefacturas (solo id >= 52)
     const newPFs = localStorage.getItem('rosaprima_new_prefacturas');
     if(newPFs){
       JSON.parse(newPFs).forEach(p=>{
-        if(!prefacturas.find(x=>x.id===p.id)) prefacturas.push(p);
-        if(!facturas.find(f=>f.npref===p.id)) agregarFacturaPendiente(p);
+        if(p.id>=52 && !prefacturas.find(x=>x.id===p.id)){
+          prefacturas.push(p);
+          if(!facturas.find(f=>f.npref===p.id)) agregarFacturaPendiente(p);
+        }
       });
     }
   } catch(e){ console.error('cargarLocalStorage error:', e); }
