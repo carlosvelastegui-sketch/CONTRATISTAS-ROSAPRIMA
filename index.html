@@ -1077,7 +1077,12 @@ function jsonp(params){
 }
 
 function apiGet(action){ return jsonp({action:action}); }
-function apiPost(data){  return jsonp(Object.assign({},data)); }
+function apiPost(data){
+  // Encode all values as strings for GET params
+  const params = {};
+  Object.entries(data).forEach(([k,v])=>{ params[k]=String(v===null||v===undefined?'':v); });
+  return jsonp(params);
+}
 
 // Cargar datos desde Google Sheets al iniciar
 async function cargarDatosCloud(){
