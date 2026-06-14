@@ -1043,8 +1043,6 @@ function showPedidoFact(){
       +'</label>'
     ).join('');
   }
-  document.getElementById('pedido-preview').style.display='none';
-  document.getElementById('btn-imprimir-pedido').style.display='none';
   document.getElementById('modal-pedido-fact').classList.add('open');
 }
 
@@ -1155,8 +1153,7 @@ function generarPedido(){
   </div>`;
 
   document.getElementById('pedido-content').innerHTML = html;
-  document.getElementById('pedido-preview').style.display='block';
-  document.getElementById('btn-imprimir-pedido').style.display='inline-flex';
+
 }
 
 function imprimirPedido(){
