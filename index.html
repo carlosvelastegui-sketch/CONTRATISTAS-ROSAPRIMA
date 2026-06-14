@@ -1030,94 +1030,109 @@ function generarPedido(){
 
   const ids = checked.map(x=>parseInt(x.value));
   const selected = facturas.filter(f=>ids.includes(f.id));
+  const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
 
-  // Group by cliente
-  const porCliente = {};
-  selected.forEach(f=>{
-    if(!porCliente[f.cliente]) porCliente[f.cliente]=[];
-    porCliente[f.cliente].push(f);
+  // Group consumos by factura id to get finca breakdown
+  const fincas = ['R1','R2','R3','R4','R5','R6'];
+
+  // Build table rows - one row per prefactura with client data + finca breakdown
+  const rows = selected.map(f=>{
+    const cli = clientes.find(c=>c.nombre===f.cliente)||{};
+    // Get consumos for this prefactura period to get finca breakdown
+    const consFact = consumos.filter(x=>x.cliente===f.cliente && x.fecha===f.fecha);
+    const porFinca = {};
+    consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
+    // If no consumos found, put total in R1 by default
+    if(!consFact.length) porFinca['R1']=f.qty;
+
+    const sub = f.subtotal||parseFloat((f.qty*(f.precioUnit||1.717)).toFixed(4));
+    const iva = f.iva||parseFloat((sub*0.15).toFixed(4));
+    const tot = f.total||parseFloat((sub+iva).toFixed(4));
+
+    return {f, cli, porFinca, sub, iva, tot};
   });
 
-  let html = '';
-  Object.entries(porCliente).forEach(([nombre, items])=>{
-    const cli = clientes.find(c=>c.nombre===nombre)||{};
-    const subtotal = items.reduce((s,f)=>s+(f.subtotal||f.qty*1.717),0);
-    const iva      = items.reduce((s,f)=>s+(f.iva||subtotal*0.15),0);
-    const total    = items.reduce((s,f)=>s+f.total,0);
-    const hoy      = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
-    const npref    = items.map(f=>f.npref||f.id).join(', ');
+  // Group by cliente for totals
+  const totales = {sub:0, iva:0, tot:0};
+  rows.forEach(r=>{ totales.sub+=r.sub; totales.iva+=r.iva; totales.tot+=r.tot; });
 
-    html += `
-    <div style="margin-bottom:32px;page-break-after:always">
-      <!-- Encabezado -->
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #185FA5">
-        <div>
-          <div style="font-size:18px;font-weight:700;color:#185FA5">ROSAPRIMA CIA. LTDA.</div>
-          <div style="font-size:12px;color:#6b7694">Cayambe, Pichincha — Ecuador</div>
-          <div style="font-size:12px;color:#6b7694">RUC: 1791893294001</div>
-        </div>
-        <div style="text-align:right">
-          <div style="font-size:14px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
-          <div style="font-size:12px;color:#6b7694">N° Prefactura(s): <strong>${npref}</strong></div>
-          <div style="font-size:12px;color:#6b7694">Fecha: <strong>${hoy}</strong></div>
-        </div>
+  const html = `
+  <div style="font-family:Inter,sans-serif">
+    <!-- Encabezado -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #185FA5">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#185FA5">ROSAPRIMA CIA. LTDA.</div>
+        <div style="font-size:11px;color:#6b7694">Cayambe, Pichincha — Ecuador | RUC: 1791893294001</div>
       </div>
-
-      <!-- Datos del cliente -->
-      <div style="background:#f8f9fb;border-radius:8px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
-        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Razón Social</span><br><strong>${nombre}</strong></div>
-        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">RUC / Cédula</span><br><strong>${cli.ruc||'—'}</strong></div>
-        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Dirección</span><br>${cli.dir||'—'}</div>
-        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Teléfono</span><br>${cli.tel||'—'}</div>
-        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Correo</span><br>${cli.correo||'—'}</div>
-        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Solicitado por</span><br>Rosaprima CIA. LTDA.</div>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
+        <div style="font-size:11px;color:#6b7694">Fecha: <strong>${hoy}</strong></div>
       </div>
+    </div>
 
-      <!-- Detalle -->
-      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px">
-        <thead>
-          <tr style="background:#0f1c3f;color:white">
-            <th style="padding:10px 12px;text-align:left;border-radius:6px 0 0 0">Descripción</th>
-            <th style="padding:10px 12px;text-align:center">Fecha Servicio</th>
-            <th style="padding:10px 12px;text-align:center">Cant.</th>
-            <th style="padding:10px 12px;text-align:right">P. Unit.</th>
-            <th style="padding:10px 12px;text-align:right;border-radius:0 6px 0 0">Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${items.map(f=>`
-          <tr style="border-bottom:1px solid #f0f2f5">
-            <td style="padding:9px 12px">${f.servicio||'Almuerzo Operativo'}</td>
-            <td style="padding:9px 12px;text-align:center;color:#6b7694">${f.fecha||'—'}</td>
-            <td style="padding:9px 12px;text-align:center;font-weight:600">${f.qty}</td>
-            <td style="padding:9px 12px;text-align:right">$${(f.precioUnit||1.717).toFixed(4)}</td>
-            <td style="padding:9px 12px;text-align:right;font-weight:600">${fmt(f.total)}</td>
-          </tr>`).join('')}
-        </tbody>
-      </table>
+    <!-- Tabla horizontal -->
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:900px">
+      <thead>
+        <tr style="background:#0f1c3f;color:white">
+          <th style="padding:8px 10px;text-align:left">Razón Social</th>
+          <th style="padding:8px 10px;text-align:left">RUC</th>
+          <th style="padding:8px 10px;text-align:left">Dirección</th>
+          <th style="padding:8px 10px;text-align:left">Teléfono</th>
+          <th style="padding:8px 10px;text-align:left">Correo</th>
+          <th style="padding:8px 10px;text-align:center">Cant.</th>
+          <th style="padding:8px 6px;text-align:center">R1</th>
+          <th style="padding:8px 6px;text-align:center">R2</th>
+          <th style="padding:8px 6px;text-align:center">R3</th>
+          <th style="padding:8px 6px;text-align:center">R4</th>
+          <th style="padding:8px 6px;text-align:center">R5</th>
+          <th style="padding:8px 6px;text-align:center">R6</th>
+          <th style="padding:8px 10px;text-align:left">Servicio</th>
+          <th style="padding:8px 10px;text-align:right">P.Unit</th>
+          <th style="padding:8px 10px;text-align:right">Subtotal</th>
+          <th style="padding:8px 10px;text-align:right">IVA 15%</th>
+          <th style="padding:8px 10px;text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((r,i)=>`
+        <tr style="border-bottom:1px solid #e2e6ed;background:${i%2===0?'white':'#f8f9fb'}">
+          <td style="padding:8px 10px;font-weight:600">${r.f.cliente}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.ruc||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.dir||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.tel||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.correo||'—'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R1']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R2']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R3']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R4']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R5']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
+          <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
+          <td style="padding:8px 10px;text-align:right">$${(r.f.precioUnit||1.717).toFixed(4)}</td>
+          <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
+          <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#0f1c3f;color:white;font-weight:700">
+          <td colspan="14" style="padding:10px 12px;text-align:right">TOTALES</td>
+          <td style="padding:10px 10px;text-align:right">${fmt(totales.sub)}</td>
+          <td style="padding:10px 10px;text-align:right">${fmt(totales.iva)}</td>
+          <td style="padding:10px 10px;text-align:right">${fmt(totales.tot)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
 
-      <!-- Totales -->
-      <div style="display:flex;justify-content:flex-end">
-        <div style="width:260px">
-          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e6ed">
-            <span style="color:#6b7694">Subtotal</span><span>${fmt(subtotal)}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e6ed">
-            <span style="color:#6b7694">IVA 15%</span><span>${fmt(iva)}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:10px 0;font-weight:700;font-size:15px;color:#185FA5">
-            <span>TOTAL</span><span>${fmt(total)}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Observaciones -->
-      <div style="margin-top:16px;padding:12px;background:#f8f9fb;border-radius:8px;font-size:12px;color:#6b7694">
-        <strong>Nota:</strong> Por favor emitir factura a nombre de <strong>ROSAPRIMA CIA. LTDA.</strong> — RUC: 1791893294001<br>
-        Enviar a: <strong>contabilidad@rosaprima.com</strong>
-      </div>
-    </div>`;
-  });
+    <!-- Nota -->
+    <div style="margin-top:16px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:11px;color:#6b7694;border-left:3px solid #185FA5">
+      <strong>Nota:</strong> Emitir factura(s) a nombre de <strong>ROSAPRIMA CIA. LTDA.</strong> — RUC: 1791893294001 | 
+      Enviar a: <strong>contabilidad@rosaprima.com</strong>
+    </div>
+  </div>`;
 
   document.getElementById('pedido-content').innerHTML = html;
   document.getElementById('pedido-preview').style.display='block';
