@@ -309,6 +309,9 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="card-header">
             <span class="card-title">Control de facturas</span>
             <div style="display:flex;gap:10px;align-items:center">
+              <button class="btn btn-primary btn-sm" onclick="showPedidoFact()" style="font-size:12px">
+                <i class="ti ti-file-invoice"></i> Pedido de Facturación
+              </button>
               <select id="filtro-ctrl" onchange="renderControl()" style="width:auto;padding:6px 10px;font-size:12px">
                 <option value="">Todas</option>
                 <option value="pagado">Pagadas</option>
@@ -479,6 +482,25 @@ tbody tr:hover td{background:#f8f9fb}
     <div class="actions">
       <button class="btn btn-success" onclick="guardarPago()"><i class="ti ti-circle-check"></i> Registrar y cerrar prefactura</button>
       <button class="btn" onclick="document.getElementById('modal-pago').classList.remove('open')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PEDIDO DE FACTURACIÓN -->
+<div class="modal-overlay" id="modal-pedido-fact">
+  <div class="modal" style="width:700px;max-height:90vh;overflow-y:auto">
+    <div class="modal-title">📋 Pedido de Facturación</div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;font-weight:600;color:#6b7694;display:block;margin-bottom:6px">Selecciona las prefacturas a incluir:</label>
+      <div id="pf-selector" style="max-height:200px;overflow-y:auto;border:1px solid #e2e6ed;border-radius:8px;padding:8px"></div>
+    </div>
+    <div id="pedido-preview" style="display:none">
+      <div style="border:1px solid #e2e6ed;border-radius:8px;padding:20px;margin-bottom:16px;background:#f8f9fb" id="pedido-content"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="generarPedido()"><i class="ti ti-eye"></i> Previsualizar</button>
+      <button class="btn btn-success" onclick="imprimirPedido()" id="btn-imprimir-pedido" style="display:none"><i class="ti ti-printer"></i> Imprimir / PDF</button>
+      <button class="btn" onclick="document.getElementById('modal-pedido-fact').classList.remove('open')">Cerrar</button>
     </div>
   </div>
 </div>
@@ -952,7 +974,7 @@ function abrirModalPago(id){
 
 function guardarPago(){
   const factura=document.getElementById("mpago-factura").value.trim();
-  if(!factura){alert("Ingresa el número de factura");return;}
+  // Factura number is optional - can be added later
   const x=facturas.find(f=>f.id===pagoId); if(!x) return;
   x.valorPagado=parseFloat(document.getElementById("mpago-valor").value)||0;
   x.retencion=parseFloat(document.getElementById("mpago-retencion").value)||0;
@@ -980,6 +1002,141 @@ function agregarFacturaPendiente(pf){
     factura: "", comprobante: "",
     estado: "pendiente_pago"
   });
+}
+
+/* PEDIDO DE FACTURACIÓN */
+function showPedidoFact(){
+  // Show all facturas pending payment (pendiente_pago)
+  const pendientes = facturas.filter(f=>f.estado==='pendiente_pago');
+  const selector = document.getElementById('pf-selector');
+  if(!pendientes.length){
+    selector.innerHTML='<div style="padding:12px;color:#94a3b8;text-align:center">No hay facturas pendientes de pago</div>';
+  } else {
+    selector.innerHTML = pendientes.map(f=>
+      '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer;hover:background:#f0f2f5">'
+      +'<input type="checkbox" value="'+f.id+'" style="width:16px;height:16px"> '
+      +'<span style="flex:1"><strong>'+f.cliente+'</strong> — '+f.qty+' alm. — '+fmt(f.total)+' — '+f.fecha+'</span>'
+      +'</label>'
+    ).join('');
+  }
+  document.getElementById('pedido-preview').style.display='none';
+  document.getElementById('btn-imprimir-pedido').style.display='none';
+  document.getElementById('modal-pedido-fact').classList.add('open');
+}
+
+function generarPedido(){
+  const checked = [...document.querySelectorAll('#pf-selector input:checked')];
+  if(!checked.length){ alert('Selecciona al menos una factura'); return; }
+
+  const ids = checked.map(x=>parseInt(x.value));
+  const selected = facturas.filter(f=>ids.includes(f.id));
+
+  // Group by cliente
+  const porCliente = {};
+  selected.forEach(f=>{
+    if(!porCliente[f.cliente]) porCliente[f.cliente]=[];
+    porCliente[f.cliente].push(f);
+  });
+
+  let html = '';
+  Object.entries(porCliente).forEach(([nombre, items])=>{
+    const cli = clientes.find(c=>c.nombre===nombre)||{};
+    const subtotal = items.reduce((s,f)=>s+(f.subtotal||f.qty*1.717),0);
+    const iva      = items.reduce((s,f)=>s+(f.iva||subtotal*0.15),0);
+    const total    = items.reduce((s,f)=>s+f.total,0);
+    const hoy      = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+    const npref    = items.map(f=>f.npref||f.id).join(', ');
+
+    html += `
+    <div style="margin-bottom:32px;page-break-after:always">
+      <!-- Encabezado -->
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #185FA5">
+        <div>
+          <div style="font-size:18px;font-weight:700;color:#185FA5">ROSAPRIMA CIA. LTDA.</div>
+          <div style="font-size:12px;color:#6b7694">Cayambe, Pichincha — Ecuador</div>
+          <div style="font-size:12px;color:#6b7694">RUC: 1791893294001</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
+          <div style="font-size:12px;color:#6b7694">N° Prefactura(s): <strong>${npref}</strong></div>
+          <div style="font-size:12px;color:#6b7694">Fecha: <strong>${hoy}</strong></div>
+        </div>
+      </div>
+
+      <!-- Datos del cliente -->
+      <div style="background:#f8f9fb;border-radius:8px;padding:14px;margin-bottom:16px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Razón Social</span><br><strong>${nombre}</strong></div>
+        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">RUC / Cédula</span><br><strong>${cli.ruc||'—'}</strong></div>
+        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Dirección</span><br>${cli.dir||'—'}</div>
+        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Teléfono</span><br>${cli.tel||'—'}</div>
+        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Correo</span><br>${cli.correo||'—'}</div>
+        <div><span style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Solicitado por</span><br>Rosaprima CIA. LTDA.</div>
+      </div>
+
+      <!-- Detalle -->
+      <table style="width:100%;border-collapse:collapse;margin-bottom:16px;font-size:13px">
+        <thead>
+          <tr style="background:#0f1c3f;color:white">
+            <th style="padding:10px 12px;text-align:left;border-radius:6px 0 0 0">Descripción</th>
+            <th style="padding:10px 12px;text-align:center">Fecha Servicio</th>
+            <th style="padding:10px 12px;text-align:center">Cant.</th>
+            <th style="padding:10px 12px;text-align:right">P. Unit.</th>
+            <th style="padding:10px 12px;text-align:right;border-radius:0 6px 0 0">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(f=>`
+          <tr style="border-bottom:1px solid #f0f2f5">
+            <td style="padding:9px 12px">${f.servicio||'Almuerzo Operativo'}</td>
+            <td style="padding:9px 12px;text-align:center;color:#6b7694">${f.fecha||'—'}</td>
+            <td style="padding:9px 12px;text-align:center;font-weight:600">${f.qty}</td>
+            <td style="padding:9px 12px;text-align:right">$${(f.precioUnit||1.717).toFixed(4)}</td>
+            <td style="padding:9px 12px;text-align:right;font-weight:600">${fmt(f.total)}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+
+      <!-- Totales -->
+      <div style="display:flex;justify-content:flex-end">
+        <div style="width:260px">
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e6ed">
+            <span style="color:#6b7694">Subtotal</span><span>${fmt(subtotal)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #e2e6ed">
+            <span style="color:#6b7694">IVA 15%</span><span>${fmt(iva)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:10px 0;font-weight:700;font-size:15px;color:#185FA5">
+            <span>TOTAL</span><span>${fmt(total)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Observaciones -->
+      <div style="margin-top:16px;padding:12px;background:#f8f9fb;border-radius:8px;font-size:12px;color:#6b7694">
+        <strong>Nota:</strong> Por favor emitir factura a nombre de <strong>ROSAPRIMA CIA. LTDA.</strong> — RUC: 1791893294001<br>
+        Enviar a: <strong>contabilidad@rosaprima.com</strong>
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('pedido-content').innerHTML = html;
+  document.getElementById('pedido-preview').style.display='block';
+  document.getElementById('btn-imprimir-pedido').style.display='inline-flex';
+}
+
+function imprimirPedido(){
+  const content = document.getElementById('pedido-content').innerHTML;
+  const win = window.open('','_blank','width=900,height:700');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+    <title>Pedido de Facturación</title>
+    <style>
+      body{font-family:Inter,sans-serif;font-size:13px;color:#1a2030;padding:30px;max-width:800px;margin:0 auto}
+      @media print{body{padding:15px}}
+      @page{margin:15mm}
+    </style>
+  </head><body>${content}</body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),400);
 }
 
 /* ESTADO DE CUENTAS */
