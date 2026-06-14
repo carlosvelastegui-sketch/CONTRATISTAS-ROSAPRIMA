@@ -1163,21 +1163,47 @@ function imprimirPedido(){
   const selected = facturas.filter(f=>ids.includes(f.id));
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
 
-  // Build Excel data
-  const rows = [];
-  // Title rows
-  rows.push(['HANASKA (Rosaprima)','','','','','','','','','','','','','','','','']);
-  rows.push(['PEDIDO DE FACTURACIÓN','','','','','Fecha:',hoy,'','','','','','','','','','']);
-  rows.push([]);
-  // Header
-  rows.push([
-    'Razón Social','RUC / Cédula','Dirección','Teléfono','Correo',
-    'Cant.','R1','R2','R3','R4','R5','R6',
-    'Servicio','P. Unitario','Subtotal','IVA 15%','Total'
-  ]);
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+  const M = {s:{r:0,c:0},e:{r:0,c:0}};
+
+  function cell(v, t, fmt, bold, bg, color){
+    const c = {v:v, t:t||'s'};
+    if(fmt) c.z = fmt;
+    c.s = {};
+    if(bold||bg||color){
+      c.s.font = bold?{bold:true}:{};
+      if(color) c.s.font.color = {rgb: color};
+      if(bg) c.s.fill = {fgColor:{rgb:bg}};
+    }
+    c.s.border = {
+      top:{style:'thin',color:{rgb:'BFBFBF'}},
+      bottom:{style:'thin',color:{rgb:'BFBFBF'}},
+      left:{style:'thin',color:{rgb:'BFBFBF'}},
+      right:{style:'thin',color:{rgb:'BFBFBF'}}
+    };
+    c.s.alignment = {vertical:'center'};
+    return c;
+  }
+
+  let R = 0;
+  const cols = 17;
+
+  // Row 0: Title
+  ws[XLSX.utils.encode_cell({r:R,c:0})] = {v:'HANASKA (Rosaprima) — PEDIDO DE FACTURACIÓN', t:'s', s:{font:{bold:true,sz:14,color:{rgb:'185FA5'}},fill:{fgColor:{rgb:'E8F0FB'}},alignment:{horizontal:'left'}}};
+  ws[XLSX.utils.encode_cell({r:R,c:14})] = {v:'Fecha: '+hoy, t:'s', s:{font:{bold:true},alignment:{horizontal:'right'}}};
+  R++;
+  R++; // blank
+
+  // Row 2: Headers
+  const headers = ['RAZON SOCIAL','RUC / CEDULA','DIRECCIÓN','TELÉFONO','CORREO','SERVICIOS','R1','R2','R3','R4','R5','R6','DETALLE SERVICIOS','VALOR UNITARIO','SUBTOTAL','IVA 15%','TOTAL'];
+  headers.forEach((h,i)=>{
+    ws[XLSX.utils.encode_cell({r:R,c:i})] = {v:h, t:'s', s:{font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'0F1C3F'}},alignment:{horizontal:'center',vertical:'center'},border:{top:{style:'thin',color:{rgb:'000000'}},bottom:{style:'thin',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}}}};
+  });
+  R++;
 
   let totSub=0, totIva=0, totTot=0;
-  selected.forEach(f=>{
+  selected.forEach((f,idx)=>{
     const cli = clientes.find(c=>c.nombre===f.cliente)||{};
     const consFact = consumos.filter(x=>x.cliente===f.cliente && x.fecha===f.fecha);
     const porFinca = {};
@@ -1190,45 +1216,35 @@ function imprimirPedido(){
     const tot = parseFloat(f.total)||parseFloat((sub+iva).toFixed(4));
     totSub+=sub; totIva+=iva; totTot+=tot;
 
-    rows.push([
-      f.cliente,
-      cli.ruc||'',
-      cli.dir||'',
-      cli.tel||'',
-      cli.correo||'',
-      f.qty,
-      porFinca['R1']||'',
-      porFinca['R2']||'',
-      porFinca['R3']||'',
-      porFinca['R4']||'',
-      porFinca['R5']||'',
-      porFinca['R6']||'',
-      f.servicio||'Almuerzo Operativo',
-      precioU,
-      sub,
-      iva,
-      tot
-    ]);
+    const bg = idx%2===0?'FFFFFF':'F0F4FF';
+    const bdr = {top:{style:'thin',color:{rgb:'BFBFBF'}},bottom:{style:'thin',color:{rgb:'BFBFBF'}},left:{style:'thin',color:{rgb:'BFBFBF'}},right:{style:'thin',color:{rgb:'BFBFBF'}}};
+    const s = (v,t,z)=>({v,t:t||'s',z:z||undefined,s:{fill:{fgColor:{rgb:bg}},border:bdr,alignment:{vertical:'center'}}});
+    const money = (v)=>({v,t:'n',z:'$#,##0.00',s:{fill:{fgColor:{rgb:bg}},border:bdr,alignment:{horizontal:'right',vertical:'center'}}});
+    const num = (v)=>({v:v||'',t:v?'n':'s',s:{fill:{fgColor:{rgb:bg}},border:bdr,alignment:{horizontal:'center',vertical:'center'}}});
+
+    const row = [
+      s(f.cliente), s(cli.ruc||''), s(cli.dir||''), s(cli.tel||''), s(cli.correo||''),
+      num(f.qty), num(porFinca['R1']||null), num(porFinca['R2']||null), num(porFinca['R3']||null),
+      num(porFinca['R4']||null), num(porFinca['R5']||null), num(porFinca['R6']||null),
+      s(f.servicio||'Almuerzo Operativo'), money(precioU), money(sub), money(iva), money(tot)
+    ];
+    row.forEach((cell,i)=>{ ws[XLSX.utils.encode_cell({r:R,c:i})] = cell; });
+    R++;
   });
 
   // Totals row
-  rows.push(['','','','','','','','','','','','','','TOTALES',
-    parseFloat(totSub.toFixed(2)),
-    parseFloat(totIva.toFixed(2)),
-    parseFloat(totTot.toFixed(2))
-  ]);
+  const totStyle = {font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'185FA5'}},border:{top:{style:'medium',color:{rgb:'000000'}},bottom:{style:'medium',color:{rgb:'000000'}},left:{style:'thin',color:{rgb:'000000'}},right:{style:'thin',color:{rgb:'000000'}}},alignment:{horizontal:'right',vertical:'center'}};
+  for(let i=0;i<14;i++) ws[XLSX.utils.encode_cell({r:R,c:i})] = {v:i===13?'TOTALES':'', t:'s', s:totStyle};
+  [{v:totSub},{v:totIva},{v:totTot}].forEach((t,i)=>{
+    ws[XLSX.utils.encode_cell({r:R,c:14+i})] = {v:parseFloat(t.v.toFixed(2)), t:'n', z:'$#,##0.00', s:totStyle};
+  });
+  R++;
 
-  // Create workbook with SheetJS
-  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Set range
+  ws['!ref'] = XLSX.utils.encode_range({s:{r:0,c:0},e:{r:R-1,c:16}});
+  ws['!cols'] = [{wch:30},{wch:16},{wch:22},{wch:13},{wch:26},{wch:9},{wch:6},{wch:6},{wch:6},{wch:6},{wch:6},{wch:6},{wch:22},{wch:13},{wch:13},{wch:10},{wch:13}];
+  ws['!rows'] = [{hpt:30},{hpt:20},{hpt:20},{hpt:22},...selected.map(()=>({hpt:20})),{hpt:22}];
 
-  // Column widths
-  ws['!cols'] = [
-    {wch:28},{wch:16},{wch:20},{wch:14},{wch:24},
-    {wch:7},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},
-    {wch:20},{wch:12},{wch:12},{wch:10},{wch:12}
-  ];
-
-  const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Pedido Facturación');
   XLSX.writeFile(wb, 'Pedido_Facturacion_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
