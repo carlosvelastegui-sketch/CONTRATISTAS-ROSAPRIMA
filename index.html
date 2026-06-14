@@ -1219,10 +1219,10 @@ function imprimirPedido(){
     var porFinca = {};
     consFact.forEach(function(x){ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
     if(!consFact.length) porFinca['R1']=f.qty;
-    var precioU = parseFloat(f.precioUnit)||1.717;
-    var sub = parseFloat((parseFloat(f.subtotal)||f.qty*precioU).toFixed(2));
-    var iva = parseFloat((parseFloat(f.iva)||sub*0.15).toFixed(2));
-    var tot = parseFloat((parseFloat(f.total)||sub+iva).toFixed(2));
+    var precioU = parseFloat(String(f.precioUnit).replace(',','.'))||1.717;
+    var sub = parseFloat((parseFloat(String(f.subtotal).replace(',','.'))||f.qty*precioU).toFixed(2));
+    var iva = parseFloat((parseFloat(String(f.iva).replace(',','.'))||sub*0.15).toFixed(2));
+    var tot = parseFloat((parseFloat(String(f.total).replace(',','.'))||sub+iva).toFixed(2));
     totSub+=sub; totIva+=iva; totTot+=tot;
 
     var bg = idx%2===0?BLANCO:AZUL_CLA;
