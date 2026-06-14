@@ -1045,9 +1045,10 @@ function generarPedido(){
     // If no consumos found, put total in R1 by default
     if(!consFact.length) porFinca['R1']=f.qty;
 
-    const sub = f.subtotal||parseFloat((f.qty*(f.precioUnit||1.717)).toFixed(4));
-    const iva = f.iva||parseFloat((sub*0.15).toFixed(4));
-    const tot = f.total||parseFloat((sub+iva).toFixed(4));
+    const precioU = parseFloat(f.precioUnit)||1.717;
+    const sub = parseFloat(f.subtotal)||parseFloat((f.qty*precioU).toFixed(4));
+    const iva = parseFloat(f.iva)||parseFloat((sub*0.15).toFixed(4));
+    const tot = parseFloat(f.total)||parseFloat((sub+iva).toFixed(4));
 
     return {f, cli, porFinca, sub, iva, tot};
   });
@@ -1061,8 +1062,7 @@ function generarPedido(){
     <!-- Encabezado -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #185FA5">
       <div>
-        <div style="font-size:16px;font-weight:700;color:#185FA5">ROSAPRIMA CIA. LTDA.</div>
-        <div style="font-size:11px;color:#6b7694">Cayambe, Pichincha — Ecuador | RUC: 1791893294001</div>
+        <div style="font-size:16px;font-weight:700;color:#185FA5">HANASKA — CONTRATOS ROSAPRIMA</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:13px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
@@ -1127,11 +1127,7 @@ function generarPedido(){
     </table>
     </div>
 
-    <!-- Nota -->
-    <div style="margin-top:16px;padding:12px;background:#f0f4ff;border-radius:8px;font-size:11px;color:#6b7694;border-left:3px solid #185FA5">
-      <strong>Nota:</strong> Emitir factura(s) a nombre de <strong>ROSAPRIMA CIA. LTDA.</strong> — RUC: 1791893294001 | 
-      Enviar a: <strong>contabilidad@rosaprima.com</strong>
-    </div>
+
   </div>`;
 
   document.getElementById('pedido-content').innerHTML = html;
