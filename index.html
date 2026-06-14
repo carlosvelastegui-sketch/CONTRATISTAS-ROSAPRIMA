@@ -5,6 +5,7 @@
 <title>Contratistas Rosaprima</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -1162,9 +1163,57 @@ function imprimirPedido(){
   var ids = checked.map(function(x){return parseInt(x.value);});
   var selected = facturas.filter(function(f){return ids.includes(f.id);});
   var hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
-  var totSub=0, totIva=0, totTot=0;
 
-  var filas = selected.map(function(f, idx){
+  var wb = new ExcelJS.Workbook();
+  var ws = wb.addWorksheet('Pedido Facturación');
+
+  var AZUL_OSC = '0F1C3F', AZUL_MED = '185FA5', AZUL_CLA = 'DCE8F8', BLANCO = 'FFFFFF', GRIS = 'BFBFBF';
+
+  function borde(){ return {top:{style:'thin',color:{argb:'FF'+GRIS}},bottom:{style:'thin',color:{argb:'FF'+GRIS}},left:{style:'thin',color:{argb:'FF'+GRIS}},right:{style:'thin',color:{argb:'FF'+GRIS}}}; }
+  function fill(c){ return {type:'pattern',pattern:'solid',fgColor:{argb:'FF'+c}}; }
+
+  // Col widths
+  [30,16,22,13,28,9,6,6,6,6,6,6,22,14,13,10,13].forEach(function(w,i){
+    ws.getColumn(i+1).width = w;
+  });
+
+  // Row 1: Title
+  ws.mergeCells('A1:Q1');
+  var r1 = ws.getRow(1); r1.height = 30;
+  var c1 = ws.getCell('A1');
+  c1.value = 'HANASKA (Rosaprima) — PEDIDO DE FACTURACIÓN';
+  c1.font = {bold:true,size:14,color:{argb:'FF'+BLANCO}};
+  c1.fill = fill(AZUL_MED);
+  c1.alignment = {horizontal:'left',vertical:'middle'};
+
+  // Row 2: Date
+  ws.mergeCells('N2:Q2');
+  ws.getRow(2).height = 18;
+  var c2 = ws.getCell('N2');
+  c2.value = 'Fecha: '+hoy;
+  c2.font = {bold:true};
+  c2.alignment = {horizontal:'right'};
+
+  // Row 3: blank
+  ws.getRow(3).height = 8;
+
+  // Row 4: Headers
+  var headers = ['RAZON SOCIAL','RUC / CEDULA','DIRECCIÓN','TELÉFONO','CORREO','SERVICIOS','R1','R2','R3','R4','R5','R6','DETALLE SERVICIOS','VALOR UNITARIO','SUBTOTAL','IVA 15%','TOTAL'];
+  var r4 = ws.getRow(4); r4.height = 22;
+  headers.forEach(function(h,i){
+    var cell = r4.getCell(i+1);
+    cell.value = h;
+    cell.font = {bold:true,color:{argb:'FF'+BLANCO},size:10};
+    cell.fill = fill(AZUL_OSC);
+    cell.alignment = {horizontal:'center',vertical:'middle',wrapText:true};
+    cell.border = borde();
+  });
+
+  // Data rows
+  var totSub=0,totIva=0,totTot=0;
+  var moneyFmt = '"$"#,##0.00';
+
+  selected.forEach(function(f,idx){
     var cli = clientes.find(function(c){return c.nombre===f.cliente;})||{};
     var consFact = consumos.filter(function(x){return x.cliente===f.cliente && x.fecha===f.fecha;});
     var porFinca = {};
@@ -1175,74 +1224,53 @@ function imprimirPedido(){
     var iva = parseFloat((parseFloat(f.iva)||sub*0.15).toFixed(2));
     var tot = parseFloat((parseFloat(f.total)||sub+iva).toFixed(2));
     totSub+=sub; totIva+=iva; totTot+=tot;
-    var bg = idx%2===0?'#ffffff':'#dce8f8';
-    var td = 'padding:6px 8px;border:1px solid #bfbfbf;';
-    return '<tr style="background:'+bg+'">'
-      +'<td style="'+td+'">'+f.cliente+'</td>'
-      +'<td style="'+td+'">'+(cli.ruc||'')+'</td>'
-      +'<td style="'+td+'">'+(cli.dir||'')+'</td>'
-      +'<td style="'+td+'">'+(cli.tel||'')+'</td>'
-      +'<td style="'+td+'">'+(cli.correo||'')+'</td>'
-      +'<td style="'+td+'text-align:center;">'+f.qty+'</td>'
-      +'<td style="'+td+'text-align:center;">'+(porFinca['R1']||'')+'</td>'
-      +'<td style="'+td+'text-align:center;">'+(porFinca['R2']||'')+'</td>'
-      +'<td style="'+td+'text-align:center;">'+(porFinca['R3']||'')+'</td>'
-      +'<td style="'+td+'text-align:center;">'+(porFinca['R4']||'')+'</td>'
-      +'<td style="'+td+'text-align:center;">'+(porFinca['R5']||'')+'</td>'
-      +'<td style="'+td+'text-align:center;">'+(porFinca['R6']||'')+'</td>'
-      +'<td style="'+td+'">'+(f.servicio||'Almuerzo Operativo')+'</td>'
-      +'<td style="'+td+'text-align:right;">$'+precioU.toFixed(4)+'</td>'
-      +'<td style="'+td+'text-align:right;">$'+sub.toFixed(2)+'</td>'
-      +'<td style="'+td+'text-align:right;">$'+iva.toFixed(2)+'</td>'
-      +'<td style="'+td+'text-align:right;font-weight:bold;">$'+tot.toFixed(2)+'</td>'
-      +'</tr>';
-  }).join('');
 
-  var th = 'padding:8px;border:1px solid #000;color:white;background:#0f1c3f;font-weight:bold;';
-  var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
-    +'xmlns:x="urn:schemas-microsoft-com:office:excel" '
-    +'xmlns="http://www.w3.org/TR/REC-html40">'
-    +'<head><meta charset="UTF-8"></head><body>'
-    +'<table style="border-collapse:collapse;font-family:Calibri,Arial;font-size:11px;width:100%">'
-    +'<tr><td colspan="17" style="background:#185FA5;color:white;font-size:14px;font-weight:bold;padding:12px;border:1px solid #185FA5;">HANASKA (Rosaprima) — PEDIDO DE FACTURACIÓN</td></tr>'
-    +'<tr><td colspan="13" style="border:none;padding:4px;"></td>'
-    +'<td colspan="4" style="font-weight:bold;text-align:right;padding:6px;border:none;">Fecha: '+hoy+'</td></tr>'
-    +'<tr><td colspan="17" style="border:none;padding:2px;"></td></tr>'
-    +'<tr>'
-    +'<th style="'+th+'">RAZON SOCIAL</th>'
-    +'<th style="'+th+'">RUC / CEDULA</th>'
-    +'<th style="'+th+'">DIRECCIÓN</th>'
-    +'<th style="'+th+'">TELÉFONO</th>'
-    +'<th style="'+th+'">CORREO</th>'
-    +'<th style="'+th+'">SERVICIOS</th>'
-    +'<th style="'+th+'">R1</th>'
-    +'<th style="'+th+'">R2</th>'
-    +'<th style="'+th+'">R3</th>'
-    +'<th style="'+th+'">R4</th>'
-    +'<th style="'+th+'">R5</th>'
-    +'<th style="'+th+'">R6</th>'
-    +'<th style="'+th+'">DETALLE SERVICIOS</th>'
-    +'<th style="'+th+'">VALOR UNITARIO</th>'
-    +'<th style="'+th+'">SUBTOTAL</th>'
-    +'<th style="'+th+'">IVA 15%</th>'
-    +'<th style="'+th+'">TOTAL</th>'
-    +'</tr>'
-    +filas
-    +'<tr style="background:#185FA5;color:white;font-weight:bold;">'
-    +'<td colspan="14" style="padding:8px;border:1px solid #000;text-align:right;background:#185FA5;color:white;">TOTALES</td>'
-    +'<td style="padding:8px;border:1px solid #000;text-align:right;background:#185FA5;color:white;">$'+totSub.toFixed(2)+'</td>'
-    +'<td style="padding:8px;border:1px solid #000;text-align:right;background:#185FA5;color:white;">$'+totIva.toFixed(2)+'</td>'
-    +'<td style="padding:8px;border:1px solid #000;text-align:right;background:#185FA5;color:white;font-size:13px;">$'+totTot.toFixed(2)+'</td>'
-    +'</tr>'
-    +'</table></body></html>';
+    var bg = idx%2===0?BLANCO:AZUL_CLA;
+    var row = ws.addRow([
+      f.cliente, cli.ruc||'', cli.dir||'', cli.tel||'', cli.correo||'',
+      f.qty,
+      porFinca['R1']||null, porFinca['R2']||null, porFinca['R3']||null,
+      porFinca['R4']||null, porFinca['R5']||null, porFinca['R6']||null,
+      f.servicio||'Almuerzo Operativo', precioU, sub, iva, tot
+    ]);
+    row.height = 18;
+    row.eachCell(function(cell,cn){
+      cell.fill = fill(bg);
+      cell.border = borde();
+      cell.alignment = {vertical:'middle'};
+      if(cn>=7&&cn<=12){ cell.alignment={horizontal:'center',vertical:'middle'}; }
+      if(cn>=14&&cn<=17){ cell.numFmt=moneyFmt; cell.alignment={horizontal:'right',vertical:'middle'}; }
+    });
+  });
 
-  var blob = new Blob(['\ufeff'+html], {type:'application/vnd.ms-excel;charset=utf-8'});
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'Pedido_Facturacion_'+new Date().toISOString().slice(0,10)+'.xls';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  // Totals row
+  var totRow = ws.addRow([]);
+  totRow.height = 22;
+  ws.mergeCells('A'+totRow.number+':N'+totRow.number);
+  var tc = ws.getCell('A'+totRow.number);
+  tc.value = 'TOTALES';
+  tc.font = {bold:true,color:{argb:'FF'+BLANCO}};
+  tc.fill = fill(AZUL_MED);
+  tc.alignment = {horizontal:'right',vertical:'middle'};
+  tc.border = borde();
+  [{v:parseFloat(totSub.toFixed(2)),c:'O'},{v:parseFloat(totIva.toFixed(2)),c:'P'},{v:parseFloat(totTot.toFixed(2)),c:'Q'}].forEach(function(t){
+    var cell = ws.getCell(t.c+totRow.number);
+    cell.value = t.v;
+    cell.numFmt = moneyFmt;
+    cell.font = {bold:true,color:{argb:'FF'+BLANCO}};
+    cell.fill = fill(AZUL_MED);
+    cell.alignment = {horizontal:'right',vertical:'middle'};
+    cell.border = borde();
+  });
+
+  // Download
+  wb.xlsx.writeBuffer().then(function(buffer){
+    var blob = new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'Pedido_Facturacion_'+new Date().toISOString().slice(0,10)+'.xlsx';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
 }
 
 
