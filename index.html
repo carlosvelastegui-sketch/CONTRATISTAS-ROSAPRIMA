@@ -1211,7 +1211,7 @@ function imprimirPedido(){
 
   // Data rows
   var totSub=0,totIva=0,totTot=0;
-  var moneyFmt = '"$"#,##0.00';
+  var moneyFmt = '_-[$$-409]* #,##0.00_-';
 
   selected.forEach(function(f,idx){
     var cli = clientes.find(function(c){return c.nombre===f.cliente;})||{};
