@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Contratistas Rosaprima</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -279,7 +280,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="card">
             <div class="card-header"><span class="card-title">Vista previa de prefactura</span>
               <div style="display:flex;gap:8px">
-                <button class="btn btn-pdf btn-sm" onclick="imprimirPF()"><i class="ti ti-file-type-pdf"></i> Descargar PDF</button>
+                <button class="btn btn-success btn-sm" onclick="imprimirPF()"><i class="ti ti-file-spreadsheet"></i> Descargar Excel</button>
                 <button class="btn btn-sm" onclick="irPS1()"><i class="ti ti-arrow-left"></i> Editar</button>
               </div>
             </div>
@@ -296,7 +297,7 @@ tbody tr:hover td{background:#f8f9fb}
             <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;margin:16px 0 8px">¡Prefactura registrada!</div>
             <div id="conf-msg" style="color:#6b7694;font-size:14px;margin-bottom:24px"></div>
             <div class="actions" style="justify-content:center">
-              <button class="btn btn-pdf" onclick="imprimirPF()"><i class="ti ti-file-type-pdf"></i> Descargar PDF</button>
+              <button class="btn btn-success" onclick="imprimirPF()"><i class="ti ti-file-spreadsheet"></i> Descargar Excel</button>
               <button class="btn btn-primary" onclick="irPS1()"><i class="ti ti-plus"></i> Nueva prefactura</button>
             </div>
           </div>
@@ -494,12 +495,9 @@ tbody tr:hover td{background:#f8f9fb}
       <label style="font-size:12px;font-weight:600;color:#6b7694;display:block;margin-bottom:6px">Selecciona las prefacturas a incluir:</label>
       <div id="pf-selector" style="max-height:200px;overflow-y:auto;border:1px solid #e2e6ed;border-radius:8px;padding:8px"></div>
     </div>
-    <div id="pedido-preview" style="display:none">
-      <div style="border:1px solid #e2e6ed;border-radius:8px;padding:20px;margin-bottom:16px;background:#f8f9fb" id="pedido-content"></div>
-    </div>
+
     <div class="actions">
-      <button class="btn btn-primary" onclick="generarPedido()"><i class="ti ti-eye"></i> Previsualizar</button>
-      <button class="btn btn-success" onclick="imprimirPedido()" id="btn-imprimir-pedido" style="display:none"><i class="ti ti-printer"></i> Imprimir / PDF</button>
+      <button class="btn btn-success" onclick="imprimirPedido()" style="background:#1a7a4a"><i class="ti ti-file-spreadsheet"></i> Descargar Excel</button>
       <button class="btn" onclick="document.getElementById('modal-pedido-fact').classList.remove('open')">Cerrar</button>
     </div>
   </div>
@@ -906,14 +904,40 @@ function confirmarPF(){
 }
 
 function imprimirPF(){
-  const cl=clientes.find(c=>c.nombre===curPF.cliente)||{ruc:"-",tel:"-",dir:"-"};
-  const area=document.getElementById("print-area");
-  area.innerHTML='<div style="padding:30px;max-width:700px;margin:0 auto;font-family:Inter,sans-serif;font-size:13px;line-height:1.6">'+generarHTMLPF(curPF,cl)+'</div>';
-  area.style.display="block";
-  document.querySelectorAll(".app").forEach(e=>e.style.display="none");
-  window.print();
-  document.querySelectorAll(".app").forEach(e=>e.style.display="");
-  area.style.display="none";
+  const cl = clientes.find(c=>c.nombre===curPF.cliente)||{};
+  const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+  
+  // Get finca breakdown from consumos
+  const consFact = consumos.filter(x=>x.cliente===curPF.cliente && x.fecha===curPF.fecha);
+  const porFinca = {};
+  consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
+  if(!consFact.length) porFinca['R1']=curPF.qty;
+
+  const precioU = parseFloat(curPF.precioUnit)||1.717;
+  const sub = parseFloat(curPF.sub)||parseFloat((curPF.qty*precioU).toFixed(4));
+  const iva = parseFloat(curPF.iva)||parseFloat((sub*0.15).toFixed(4));
+  const tot = parseFloat(curPF.total)||parseFloat((sub+iva).toFixed(4));
+
+  const rows = [
+    ['HANASKA (Rosaprima)','','','','','','','','','','','','','','','',''],
+    ['PEDIDO DE FACTURACIÓN','','','','','Fecha:',hoy,'','','','','','','','','',''],
+    [],
+    ['Razón Social','RUC / Cédula','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','P. Unitario','Subtotal','IVA 15%','Total'],
+    [
+      curPF.cliente, cl.ruc||'', cl.dir||'', cl.tel||'', cl.correo||'',
+      curPF.qty,
+      porFinca['R1']||'', porFinca['R2']||'', porFinca['R3']||'',
+      porFinca['R4']||'', porFinca['R5']||'', porFinca['R6']||'',
+      curPF.servicio||'Almuerzo Operativo', precioU, sub, iva, tot
+    ],
+    ['','','','','','','','','','','','','','TOTALES', parseFloat(sub.toFixed(2)), parseFloat(iva.toFixed(2)), parseFloat(tot.toFixed(2))]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:28},{wch:16},{wch:20},{wch:14},{wch:24},{wch:7},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:20},{wch:12},{wch:12},{wch:10},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pedido Facturación');
+  XLSX.writeFile(wb, 'Pedido_Fact_'+String(curPF.id).padStart(5,'0')+'_'+curPF.cliente.replace(/[^a-zA-Z0-9]/g,'_')+'.xlsx');
 }
 
 /* CONTROL */
@@ -1062,7 +1086,7 @@ function generarPedido(){
     <!-- Encabezado -->
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #185FA5">
       <div>
-        <div style="font-size:16px;font-weight:700;color:#185FA5">HANASKA — CONTRATOS ROSAPRIMA</div>
+        <div style="font-size:16px;font-weight:700;color:#185FA5">HANASKA (Rosaprima)</div>
       </div>
       <div style="text-align:right">
         <div style="font-size:13px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
@@ -1136,18 +1160,80 @@ function generarPedido(){
 }
 
 function imprimirPedido(){
-  const content = document.getElementById('pedido-content').innerHTML;
-  const win = window.open('','_blank','width=900,height:700');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
-    <title>Pedido de Facturación</title>
-    <style>
-      body{font-family:Inter,sans-serif;font-size:13px;color:#1a2030;padding:30px;max-width:800px;margin:0 auto}
-      @media print{body{padding:15px}}
-      @page{margin:15mm}
-    </style>
-  </head><body>${content}</body></html>`);
-  win.document.close();
-  setTimeout(()=>win.print(),400);
+  const checked = [...document.querySelectorAll('#pf-selector input:checked')];
+  if(!checked.length){ alert('Selecciona al menos una factura'); return; }
+  const ids = checked.map(x=>parseInt(x.value));
+  const selected = facturas.filter(f=>ids.includes(f.id));
+  const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+
+  // Build Excel data
+  const rows = [];
+  // Title rows
+  rows.push(['HANASKA (Rosaprima)','','','','','','','','','','','','','','','','']);
+  rows.push(['PEDIDO DE FACTURACIÓN','','','','','Fecha:',hoy,'','','','','','','','','','']);
+  rows.push([]);
+  // Header
+  rows.push([
+    'Razón Social','RUC / Cédula','Dirección','Teléfono','Correo',
+    'Cant.','R1','R2','R3','R4','R5','R6',
+    'Servicio','P. Unitario','Subtotal','IVA 15%','Total'
+  ]);
+
+  let totSub=0, totIva=0, totTot=0;
+  selected.forEach(f=>{
+    const cli = clientes.find(c=>c.nombre===f.cliente)||{};
+    const consFact = consumos.filter(x=>x.cliente===f.cliente && x.fecha===f.fecha);
+    const porFinca = {};
+    consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
+    if(!consFact.length) porFinca['R1']=f.qty;
+
+    const precioU = parseFloat(f.precioUnit)||1.717;
+    const sub = parseFloat(f.subtotal)||parseFloat((f.qty*precioU).toFixed(4));
+    const iva = parseFloat(f.iva)||parseFloat((sub*0.15).toFixed(4));
+    const tot = parseFloat(f.total)||parseFloat((sub+iva).toFixed(4));
+    totSub+=sub; totIva+=iva; totTot+=tot;
+
+    rows.push([
+      f.cliente,
+      cli.ruc||'',
+      cli.dir||'',
+      cli.tel||'',
+      cli.correo||'',
+      f.qty,
+      porFinca['R1']||'',
+      porFinca['R2']||'',
+      porFinca['R3']||'',
+      porFinca['R4']||'',
+      porFinca['R5']||'',
+      porFinca['R6']||'',
+      f.servicio||'Almuerzo Operativo',
+      precioU,
+      sub,
+      iva,
+      tot
+    ]);
+  });
+
+  // Totals row
+  rows.push(['','','','','','','','','','','','','','TOTALES',
+    parseFloat(totSub.toFixed(2)),
+    parseFloat(totIva.toFixed(2)),
+    parseFloat(totTot.toFixed(2))
+  ]);
+
+  // Create workbook with SheetJS
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:28},{wch:16},{wch:20},{wch:14},{wch:24},
+    {wch:7},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},
+    {wch:20},{wch:12},{wch:12},{wch:10},{wch:12}
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pedido Facturación');
+  XLSX.writeFile(wb, 'Pedido_Facturacion_'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 
 /* ESTADO DE CUENTAS */
