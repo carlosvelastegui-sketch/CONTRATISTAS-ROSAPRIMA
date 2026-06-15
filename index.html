@@ -1574,6 +1574,7 @@ function cerrarModal(){document.getElementById("modal-cli").classList.remove("op
 
 poblar(); calcPF(); agregarLinea();
 cargarLocalStorage();
+showTab('dashboard', document.querySelector('.nav-item'));
 renderDash();
 cargarDatosCloud().then(function(){ renderDash(); renderControl(); });
 </script>
