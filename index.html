@@ -311,6 +311,9 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="card-header">
             <span class="card-title">Control de facturas</span>
             <div style="display:flex;gap:10px;align-items:center">
+              <button class="btn btn-primary btn-sm" onclick="showPedidoFact()" style="font-size:12px">
+                <i class="ti ti-file-invoice"></i> Pedido de Facturación
+              </button>
               <select id="filtro-ctrl" onchange="renderControl()" style="width:auto;padding:6px 10px;font-size:12px">
                 <option value="">Todas</option>
                 <option value="pagado">Pagadas</option>
@@ -485,6 +488,25 @@ tbody tr:hover td{background:#f8f9fb}
   </div>
 </div>
 
+
+
+<!-- MODAL PEDIDO DE FACTURACIÓN -->
+<div class="modal-overlay" id="modal-pedido-fact">
+  <div class="modal" style="width:800px;max-height:90vh;overflow-y:auto">
+    <div class="modal-title">📋 Pedido de Facturación</div>
+    <div style="margin-bottom:16px">
+      <label style="font-size:12px;font-weight:600;color:#6b7694;display:block;margin-bottom:6px">Selecciona las prefacturas a incluir:</label>
+      <div id="pf-selector" style="max-height:180px;overflow-y:auto;border:1px solid #e2e6ed;border-radius:8px;padding:8px"></div>
+    </div>
+    <div id="pedido-content" style="margin-bottom:16px;overflow-x:auto"></div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="generarPedido()"><i class="ti ti-eye"></i> Vista previa</button>
+      <button class="btn btn-success" onclick="descargarPedidoExcel()"><i class="ti ti-file-spreadsheet"></i> Descargar Excel</button>
+      <button class="btn btn-pdf" onclick="descargarPedidoPDF()"><i class="ti ti-file-type-pdf"></i> Descargar PDF</button>
+      <button class="btn" onclick="cerrarPedido()">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ÁREA DE IMPRESIÓN PDF -->
 <div id="print-area"></div>
@@ -1005,6 +1027,269 @@ function agregarFacturaPendiente(pf){
     estado: "pendiente_pago"
   });
 }
+
+/* ── PEDIDO DE FACTURACIÓN ─────────────────────────────── */
+const PRECIOS_PF = {
+  "Almuerzo Operativo":        {neto:1.717,  iva:0.258,  total:1.98},
+  "Almuerzo Administrativo":   {neto:1.818,  iva:0.273,  total:2.10},
+  "Desayuno Administrativo":   {neto:1.3636, iva:0.205,  total:1.57},
+  "Desayuno Reforzado":        {neto:1.3636, iva:0.205,  total:1.57},
+  "Refrigerio R1":             {neto:0.6566, iva:0.098,  total:0.76},
+  "Refrigerio 2":              {neto:0.3536, iva:0.053,  total:0.41},
+  "Desayuno Vianda":           {neto:0.6566, iva:0.098,  total:0.76},
+  "Desayuno Reforzado Vianda": {neto:1.3636, iva:0.205,  total:1.57},
+  "Merienda Vianda":           {neto:1.717,  iva:0.258,  total:1.98},
+  "Refrigerio 1 Vianda":       {neto:0.6566, iva:0.098,  total:0.76},
+  "Refrigerio 2 Vianda":       {neto:0.3536, iva:0.053,  total:0.41}
+};
+
+function getPrecioPF(servicio, precioUnitRaw){
+  // Normalizar precio desde el registro
+  var s = String(precioUnitRaw||'').trim();
+  if(/^\d+,\d+$/.test(s)) s = s.replace(',','.');
+  var n = parseFloat(s);
+  if(!isNaN(n) && n > 100) n = n / 1000;
+  if(isNaN(n) || n === 0){
+    var p = PRECIOS_PF[servicio] || PRECIOS_PF["Almuerzo Operativo"];
+    n = p.neto;
+  }
+  return parseFloat(n.toFixed(4));
+}
+
+function calcFilaPF(f){
+  const cli  = clientes.find(c=>c.nombre===f.cliente)||{};
+  const todosC = consumosHistoricos.concat(consumos);
+  const consFact = todosC.filter(x=>x.cliente===f.cliente && x.fecha===f.fecha);
+  const porFinca = {};
+  consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
+  if(!Object.keys(porFinca).length) porFinca['R1'] = f.qty;
+  const precioU = getPrecioPF(f.servicio, f.precioUnit);
+  const sub = parseFloat((f.qty * precioU).toFixed(4));
+  const iva = parseFloat((sub * 0.15).toFixed(4));
+  const tot = parseFloat((sub + iva).toFixed(4));
+  return {f, cli, porFinca, precioU, sub, iva, tot};
+}
+
+function showPedidoFact(){
+  const pendientes = facturas.filter(f=>f.estado==='pendiente_pago');
+  const selector = document.getElementById('pf-selector');
+  document.getElementById('pedido-content').innerHTML = '';
+  if(!pendientes.length){
+    selector.innerHTML='<div style="padding:12px;color:#94a3b8;text-align:center">No hay prefacturas pendientes de pago</div>';
+  } else {
+    selector.innerHTML = pendientes.map(f=>
+      '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer">'
+      +'<input type="checkbox" value="'+f.id+'" style="width:16px;height:16px"> '
+      +'<span style="flex:1;font-size:13px"><strong>PF-'+String(f.npref||f.id).padStart(5,"0")+'</strong> · '+f.cliente+' · '+f.qty+' alm. · '+fmt(f.total)+' · '+f.fecha+'</span>'
+      +'</label>'
+    ).join('');
+  }
+  document.getElementById('modal-pedido-fact').classList.add('open');
+}
+
+function cerrarPedido(){
+  document.getElementById('modal-pedido-fact').classList.remove('open');
+  document.getElementById('pedido-content').innerHTML='';
+}
+
+function getSeleccionadas(){
+  const checked = [...document.querySelectorAll('#pf-selector input:checked')];
+  if(!checked.length){ alert('Selecciona al menos una prefactura'); return null; }
+  const ids = checked.map(x=>parseInt(x.value));
+  return facturas.filter(f=>ids.includes(f.id));
+}
+
+function generarPedido(){
+  const selected = getSeleccionadas(); if(!selected) return;
+  const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+  const filas = selected.map(calcFilaPF);
+  const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
+
+  const html = `<div style="font-family:Inter,sans-serif;font-size:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #185FA5">
+      <div style="font-size:15px;font-weight:700;color:#185FA5">HANASKA · Rosaprima</div>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:700;color:#0f1c3f">PEDIDO DE FACTURACIÓN</div>
+        <div style="font-size:11px;color:#6b7694">Fecha: ${hoy}</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:960px">
+      <thead>
+        <tr style="background:#0f1c3f;color:white">
+          <th style="padding:8px 10px;text-align:left">Razón Social</th>
+          <th style="padding:8px 10px;text-align:left">RUC</th>
+          <th style="padding:8px 10px;text-align:left">Dirección</th>
+          <th style="padding:8px 10px;text-align:left">Teléfono</th>
+          <th style="padding:8px 10px;text-align:left">Correo</th>
+          <th style="padding:8px 8px;text-align:center">Cant.</th>
+          <th style="padding:8px 6px;text-align:center">R1</th>
+          <th style="padding:8px 6px;text-align:center">R2</th>
+          <th style="padding:8px 6px;text-align:center">R3</th>
+          <th style="padding:8px 6px;text-align:center">R4</th>
+          <th style="padding:8px 6px;text-align:center">R5</th>
+          <th style="padding:8px 6px;text-align:center">R6</th>
+          <th style="padding:8px 10px;text-align:left">Servicio</th>
+          <th style="padding:8px 10px;text-align:right">P. Neto</th>
+          <th style="padding:8px 10px;text-align:right">Subtotal</th>
+          <th style="padding:8px 10px;text-align:right">IVA 15%</th>
+          <th style="padding:8px 10px;text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filas.map((r,i)=>`
+        <tr style="border-bottom:1px solid #e2e6ed;background:${i%2===0?'white':'#f8f9fb'}">
+          <td style="padding:8px 10px;font-weight:600">${r.f.cliente}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.ruc||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.dir||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.tel||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.correo||'—'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R1']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R2']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R3']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R4']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R5']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
+          <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
+          <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
+          <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
+          <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#0f1c3f;color:white;font-weight:700">
+          <td colspan="14" style="padding:10px 12px;text-align:right">TOTALES</td>
+          <td style="padding:10px;text-align:right">${fmt(totales.sub)}</td>
+          <td style="padding:10px;text-align:right">${fmt(totales.iva)}</td>
+          <td style="padding:10px;text-align:right">${fmt(totales.tot)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+  </div>`;
+
+  document.getElementById('pedido-content').innerHTML = html;
+}
+
+function descargarPedidoExcel(){
+  const selected = getSeleccionadas(); if(!selected) return;
+  const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+  const filas = selected.map(calcFilaPF);
+  const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
+
+  const rows = [
+    ['HANASKA (Rosaprima) — PEDIDO DE FACTURACIÓN','','','','','','','','','','','','','','','',''],
+    ['Fecha:', hoy,'','','','','','','','','','','','','','',''],
+    [],
+    ['Razón Social','RUC','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','P. Neto','Subtotal','IVA 15%','Total'],
+    ...filas.map(r=>[
+      r.f.cliente, r.cli.ruc||'', r.cli.dir||'', r.cli.tel||'', r.cli.correo||'',
+      r.f.qty,
+      r.porFinca['R1']||'', r.porFinca['R2']||'', r.porFinca['R3']||'',
+      r.porFinca['R4']||'', r.porFinca['R5']||'', r.porFinca['R6']||'',
+      r.f.servicio||'Almuerzo Operativo',
+      r.precioU, r.sub, r.iva, r.tot
+    ]),
+    ['','','','','','','','','','','','','','TOTALES', totales.sub, totales.iva, totales.tot]
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [{wch:28},{wch:16},{wch:20},{wch:14},{wch:24},{wch:7},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:22},{wch:10},{wch:12},{wch:10},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pedido Facturación');
+  XLSX.writeFile(wb, 'Pedido_Facturacion_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+function descargarPedidoPDF(){
+  const selected = getSeleccionadas(); if(!selected) return;
+  const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+  const filas = selected.map(calcFilaPF);
+  const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
+
+  const area = document.getElementById('print-area');
+  area.innerHTML = `
+  <div style="padding:28px;max-width:1100px;margin:0 auto;font-family:Inter,sans-serif;font-size:11px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #0f1c3f">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#0f1c3f">HANASKA · Rosaprima</div>
+        <div style="height:4px;width:140px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);border-radius:2px;margin-top:6px"></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:15px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
+        <div style="font-size:11px;color:#6b7694;margin-top:4px">Fecha: ${hoy}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead>
+        <tr style="background:#0f1c3f;color:white">
+          <th style="padding:7px 8px;text-align:left">Razón Social</th>
+          <th style="padding:7px 8px;text-align:left">RUC</th>
+          <th style="padding:7px 8px;text-align:left">Dirección</th>
+          <th style="padding:7px 6px;text-align:left">Teléfono</th>
+          <th style="padding:7px 6px;text-align:left">Correo</th>
+          <th style="padding:7px 6px;text-align:center">Cant.</th>
+          <th style="padding:7px 4px;text-align:center">R1</th>
+          <th style="padding:7px 4px;text-align:center">R2</th>
+          <th style="padding:7px 4px;text-align:center">R3</th>
+          <th style="padding:7px 4px;text-align:center">R4</th>
+          <th style="padding:7px 4px;text-align:center">R5</th>
+          <th style="padding:7px 4px;text-align:center">R6</th>
+          <th style="padding:7px 8px;text-align:left">Servicio</th>
+          <th style="padding:7px 8px;text-align:right">P. Neto</th>
+          <th style="padding:7px 8px;text-align:right">Subtotal</th>
+          <th style="padding:7px 8px;text-align:right">IVA 15%</th>
+          <th style="padding:7px 8px;text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filas.map((r,i)=>`
+        <tr style="background:${i%2===0?'white':'#f0f6fe'};border-bottom:1px solid #e2e6ed">
+          <td style="padding:7px 8px;font-weight:600">${r.f.cliente}</td>
+          <td style="padding:7px 8px;color:#555">${r.cli.ruc||'—'}</td>
+          <td style="padding:7px 8px;color:#555">${r.cli.dir||'—'}</td>
+          <td style="padding:7px 6px;color:#555">${r.cli.tel||'—'}</td>
+          <td style="padding:7px 6px;color:#555">${r.cli.correo||'—'}</td>
+          <td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R1']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R2']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R3']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R4']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R5']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R6']||''}</td>
+          <td style="padding:7px 8px">${r.f.servicio||'Almuerzo Operativo'}</td>
+          <td style="padding:7px 8px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
+          <td style="padding:7px 8px;text-align:right">${fmt(r.sub)}</td>
+          <td style="padding:7px 8px;text-align:right">${fmt(r.iva)}</td>
+          <td style="padding:7px 8px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#0f1c3f;color:white;font-weight:700">
+          <td colspan="14" style="padding:8px 10px;text-align:right">TOTALES</td>
+          <td style="padding:8px;text-align:right">${fmt(totales.sub)}</td>
+          <td style="padding:8px;text-align:right">${fmt(totales.iva)}</td>
+          <td style="padding:8px;text-align:right">${fmt(totales.tot)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div style="margin-top:30px;padding-top:12px;border-top:1px solid #e2e6ed;text-align:center;font-size:10px;color:#6b7694">
+      <div style="height:3px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);margin-bottom:8px;border-radius:2px"></div>
+      Elaborado por: <strong>Ing. Carlos Velástegui</strong> · Administrador · Hanaska · ${hoy}
+    </div>
+  </div>`;
+
+  area.style.display = 'block';
+  document.querySelectorAll('.app').forEach(e=>e.style.display='none');
+  document.getElementById('modal-pedido-fact').classList.remove('open');
+  window.print();
+  document.querySelectorAll('.app').forEach(e=>e.style.display='');
+  area.style.display = 'none';
+  area.innerHTML = '';
+}
+
+
 
 
 
