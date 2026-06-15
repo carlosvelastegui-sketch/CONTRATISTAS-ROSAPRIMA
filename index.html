@@ -1100,12 +1100,19 @@ function generarPedido(){
     // If no consumos found, put total in R1 by default
     if(!consFact.length) porFinca['R1']=f.qty;
 
-    const precioU = parseFloat(f.precioUnit)||1.717;
+    const precioU = (function(v){
+      if(!v) return 1.717;
+      // Normalizar: reemplazar coma por punto y parsear
+      var n = parseFloat(String(v).replace(',','.'));
+      // Si el valor es > 100 probablemente viene sin decimal (ej: 1717 en lugar de 1.717)
+      if(n > 100) n = n / 1000;
+      return isNaN(n) ? 1.717 : n;
+    })(f.precioUnit);
     const sub = parseFloat((parseFloat(f.subtotal)||f.qty*precioU).toFixed(2));
     const iva = parseFloat((parseFloat(f.iva)||sub*0.15).toFixed(2));
     const tot = parseFloat((parseFloat(f.total)||sub+iva).toFixed(2));
 
-    return {f, cli, porFinca, sub, iva, tot};
+    return {f, cli, porFinca, precioU, sub, iva, tot};
   });
 
   // Group by cliente for totals
@@ -1165,7 +1172,7 @@ function generarPedido(){
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R5']||''}</td>
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
-          <td style="padding:8px 10px;text-align:right">$${(r.f.precioUnit||1.717).toFixed(4)}</td>
+          <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4)}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
           <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
