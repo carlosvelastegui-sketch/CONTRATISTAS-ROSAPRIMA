@@ -490,16 +490,17 @@ tbody tr:hover td{background:#f8f9fb}
 
 <!-- MODAL PEDIDO DE FACTURACIÓN -->
 <div class="modal-overlay" id="modal-pedido-fact">
-  <div class="modal" style="width:700px;max-height:90vh;overflow-y:auto">
+  <div class="modal" style="width:760px;max-height:90vh;overflow-y:auto">
     <div class="modal-title">📋 Pedido de Facturación</div>
     <div style="margin-bottom:16px">
       <label style="font-size:12px;font-weight:600;color:#6b7694;display:block;margin-bottom:6px">Selecciona las prefacturas a incluir:</label>
-      <div id="pf-selector" style="max-height:200px;overflow-y:auto;border:1px solid #e2e6ed;border-radius:8px;padding:8px"></div>
+      <div id="pf-selector" style="max-height:160px;overflow-y:auto;border:1px solid #e2e6ed;border-radius:8px;padding:8px"></div>
     </div>
-
+    <div id="pedido-content" style="margin-bottom:16px"></div>
     <div class="actions">
-      <button class="btn btn-success" onclick="imprimirPedido()" style="background:#1a7a4a"><i class="ti ti-file-spreadsheet"></i> Descargar Excel</button>
-      <button class="btn" onclick="document.getElementById('modal-pedido-fact').classList.remove('open')">Cerrar</button>
+      <button class="btn btn-primary" onclick="generarPedido()"><i class="ti ti-eye"></i> Vista previa</button>
+      <button class="btn btn-pdf" onclick="imprimirPedido()"><i class="ti ti-file-type-pdf"></i> Descargar PDF</button>
+      <button class="btn" onclick="document.getElementById('modal-pedido-fact').classList.remove('open');document.getElementById('pedido-content').innerHTML=''">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1137,120 +1138,112 @@ function generarPedido(){
 }
 
 function imprimirPedido(){
-  var checked = Array.from(document.querySelectorAll('#pf-selector input:checked'));
+  const checked = Array.from(document.querySelectorAll('#pf-selector input:checked'));
   if(!checked.length){ alert('Selecciona al menos una factura'); return; }
-  var ids = checked.map(function(x){return parseInt(x.value);});
-  var selected = facturas.filter(function(f){return ids.includes(f.id);});
-  var hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
+  const ids = checked.map(x=>parseInt(x.value));
+  const selected = facturas.filter(f=>ids.includes(f.id));
+  const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
 
-  var wb = new ExcelJS.Workbook();
-  var ws = wb.addWorksheet('Pedido Facturación');
+  function normalizarPrecio(v){
+    if(!v) return 1.717;
+    let n = parseFloat(String(v).replace(',','.'));
+    if(n > 100) n = n / 1000;
+    return isNaN(n) ? 1.717 : n;
+  }
 
-  var AZUL_OSC = '0F1C3F', AZUL_MED = '185FA5', AZUL_CLA = 'DCE8F8', BLANCO = 'FFFFFF', GRIS = 'BFBFBF';
-
-  function borde(){ return {top:{style:'thin',color:{argb:'FF'+GRIS}},bottom:{style:'thin',color:{argb:'FF'+GRIS}},left:{style:'thin',color:{argb:'FF'+GRIS}},right:{style:'thin',color:{argb:'FF'+GRIS}}}; }
-  function fill(c){ return {type:'pattern',pattern:'solid',fgColor:{argb:'FF'+c}}; }
-
-  // Col widths
-  [30,16,22,13,28,9,6,6,6,6,6,6,22,14,13,10,13].forEach(function(w,i){
-    ws.getColumn(i+1).width = w;
-  });
-
-  // Row 1: Title
-  ws.mergeCells('A1:Q1');
-  var r1 = ws.getRow(1); r1.height = 30;
-  var c1 = ws.getCell('A1');
-  c1.value = 'HANASKA (Rosaprima) — PEDIDO DE FACTURACIÓN';
-  c1.font = {bold:true,size:14,color:{argb:'FF'+BLANCO}};
-  c1.fill = fill(AZUL_MED);
-  c1.alignment = {horizontal:'left',vertical:'middle'};
-
-  // Row 2: Date
-  ws.mergeCells('N2:Q2');
-  ws.getRow(2).height = 18;
-  var c2 = ws.getCell('N2');
-  c2.value = 'Fecha: '+hoy;
-  c2.font = {bold:true};
-  c2.alignment = {horizontal:'right'};
-
-  // Row 3: blank
-  ws.getRow(3).height = 8;
-
-  // Row 4: Headers
-  var headers = ['RAZON SOCIAL','RUC / CEDULA','DIRECCIÓN','TELÉFONO','CORREO','SERVICIOS','R1','R2','R3','R4','R5','R6','DETALLE SERVICIOS','VALOR UNITARIO','SUBTOTAL','IVA 15%','TOTAL'];
-  var r4 = ws.getRow(4); r4.height = 22;
-  headers.forEach(function(h,i){
-    var cell = r4.getCell(i+1);
-    cell.value = h;
-    cell.font = {bold:true,color:{argb:'FF'+BLANCO},size:10};
-    cell.fill = fill(AZUL_OSC);
-    cell.alignment = {horizontal:'center',vertical:'middle',wrapText:true};
-    cell.border = borde();
-  });
-
-  // Data rows
-  var totSub=0,totIva=0,totTot=0;
-  var moneyFmt = '0.00';
-  function fmtMoney(v){ return '$ '+parseFloat(v).toFixed(2).replace('.',','); }
-
-  selected.forEach(function(f,idx){
-    var cli = clientes.find(function(c){return c.nombre===f.cliente;})||{};
-    var consFact = consumos.filter(function(x){return x.cliente===f.cliente && x.fecha===f.fecha;});
-    var porFinca = {};
-    consFact.forEach(function(x){ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
+  let totSub=0, totIva=0, totTot=0;
+  const filas = selected.map((f,i)=>{
+    const cli = clientes.find(c=>c.nombre===f.cliente)||{};
+    const todosC = consumosHistoricos.concat(consumos);
+    const consFact = todosC.filter(x=>x.cliente===f.cliente && x.fecha===f.fecha);
+    const porFinca = {};
+    consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
     if(!consFact.length) porFinca['R1']=f.qty;
-    var precioU = parseFloat(String(f.precioUnit).replace(',','.'))||1.717;
-    var sub = parseFloat((parseFloat(String(f.subtotal).replace(',','.'))||f.qty*precioU).toFixed(2));
-    var iva = parseFloat((parseFloat(String(f.iva).replace(',','.'))||sub*0.15).toFixed(2));
-    var tot = parseFloat((parseFloat(String(f.total).replace(',','.'))||sub+iva).toFixed(2));
+    const precioU = normalizarPrecio(f.precioUnit);
+    const sub = parseFloat((parseFloat(f.subtotal)||f.qty*precioU).toFixed(2));
+    const iva = parseFloat((parseFloat(f.iva)||sub*0.15).toFixed(2));
+    const tot = parseFloat((parseFloat(f.total)||sub+iva).toFixed(2));
     totSub+=sub; totIva+=iva; totTot+=tot;
+    const bg = i%2===0?'white':'#f0f6fe';
+    return `<tr style="background:${bg};border-bottom:1px solid #e2e6ed">
+      <td style="padding:7px 8px;font-weight:600">${f.cliente}</td>
+      <td style="padding:7px 8px;color:#555">${cli.ruc||'—'}</td>
+      <td style="padding:7px 8px;color:#555">${cli.dir||'—'}</td>
+      <td style="padding:7px 8px;color:#555">${cli.tel||'—'}</td>
+      <td style="padding:7px 8px;color:#555">${cli.correo||'—'}</td>
+      <td style="padding:7px 8px;text-align:center;font-weight:700;color:#185FA5">${f.qty}</td>
+      <td style="padding:7px 4px;text-align:center">${porFinca['R1']||''}</td>
+      <td style="padding:7px 4px;text-align:center">${porFinca['R2']||''}</td>
+      <td style="padding:7px 4px;text-align:center">${porFinca['R3']||''}</td>
+      <td style="padding:7px 4px;text-align:center">${porFinca['R4']||''}</td>
+      <td style="padding:7px 4px;text-align:center">${porFinca['R5']||''}</td>
+      <td style="padding:7px 4px;text-align:center">${porFinca['R6']||''}</td>
+      <td style="padding:7px 8px">${f.servicio||'Almuerzo Operativo'}</td>
+      <td style="padding:7px 8px;text-align:right">$${precioU.toFixed(4)}</td>
+      <td style="padding:7px 8px;text-align:right">${fmt(sub)}</td>
+      <td style="padding:7px 8px;text-align:right">${fmt(iva)}</td>
+      <td style="padding:7px 8px;text-align:right;font-weight:700">${fmt(tot)}</td>
+    </tr>`;
+  }).join('');
 
-    var bg = idx%2===0?BLANCO:AZUL_CLA;
-    var row = ws.addRow([
-      f.cliente, cli.ruc||'', cli.dir||'', cli.tel||'', cli.correo||'',
-      f.qty,
-      porFinca['R1']||null, porFinca['R2']||null, porFinca['R3']||null,
-      porFinca['R4']||null, porFinca['R5']||null, porFinca['R6']||null,
-      f.servicio||'Almuerzo Operativo',
-      String(precioU.toFixed(4)).replace('.',','), fmtMoney(sub), fmtMoney(iva), fmtMoney(tot)
-    ]);
-    row.height = 18;
-    row.eachCell(function(cell,cn){
-      cell.fill = fill(bg);
-      cell.border = borde();
-      cell.alignment = {vertical:'middle'};
-      if(cn>=7&&cn<=12){ cell.alignment={horizontal:'center',vertical:'middle'}; }
-      if(cn>=14&&cn<=17){ cell.alignment={horizontal:'right',vertical:'middle'}; }
-    });
-  });
+  const area = document.getElementById('print-area');
+  area.innerHTML = `
+  <div style="padding:30px;max-width:1100px;margin:0 auto;font-family:Inter,sans-serif;font-size:11px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #0f1c3f">
+      <div>
+        <img src="${LOGO_B64}" style="height:45px;margin-bottom:4px">
+        <div style="height:4px;width:120px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);border-radius:2px;margin-top:4px"></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:16px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
+        <div style="font-size:11px;color:#6b7694">Fecha: ${hoy}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead>
+        <tr style="background:#0f1c3f;color:white">
+          <th style="padding:8px;text-align:left">Razón Social</th>
+          <th style="padding:8px;text-align:left">RUC</th>
+          <th style="padding:8px;text-align:left">Dirección</th>
+          <th style="padding:8px;text-align:left">Teléfono</th>
+          <th style="padding:8px;text-align:left">Correo</th>
+          <th style="padding:8px;text-align:center">Cant.</th>
+          <th style="padding:8px 4px;text-align:center">R1</th>
+          <th style="padding:8px 4px;text-align:center">R2</th>
+          <th style="padding:8px 4px;text-align:center">R3</th>
+          <th style="padding:8px 4px;text-align:center">R4</th>
+          <th style="padding:8px 4px;text-align:center">R5</th>
+          <th style="padding:8px 4px;text-align:center">R6</th>
+          <th style="padding:8px;text-align:left">Servicio</th>
+          <th style="padding:8px;text-align:right">P.Unit.</th>
+          <th style="padding:8px;text-align:right">Subtotal</th>
+          <th style="padding:8px;text-align:right">IVA 15%</th>
+          <th style="padding:8px;text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>${filas}</tbody>
+      <tfoot>
+        <tr style="background:#0f1c3f;color:white;font-weight:700">
+          <td colspan="14" style="padding:8px 10px;text-align:right">TOTALES</td>
+          <td style="padding:8px;text-align:right">${fmt(totSub)}</td>
+          <td style="padding:8px;text-align:right">${fmt(totIva)}</td>
+          <td style="padding:8px;text-align:right">${fmt(totTot)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div style="margin-top:30px;padding-top:12px;border-top:1px solid #e2e6ed;text-align:center;font-size:10px;color:#6b7694">
+      <div style="height:3px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);margin-bottom:8px;border-radius:2px"></div>
+      Elaborado por: <strong>Ing. Carlos Velástegui</strong> · Administrador · Hanaska · ${hoy}
+    </div>
+  </div>`;
 
-  // Totals row
-  var totRow = ws.addRow([]);
-  totRow.height = 22;
-  ws.mergeCells('A'+totRow.number+':N'+totRow.number);
-  var tc = ws.getCell('A'+totRow.number);
-  tc.value = 'TOTALES';
-  tc.font = {bold:true,color:{argb:'FF'+BLANCO}};
-  tc.fill = fill(AZUL_MED);
-  tc.alignment = {horizontal:'right',vertical:'middle'};
-  tc.border = borde();
-  [{v:fmtMoney(totSub),c:'O'},{v:fmtMoney(totIva),c:'P'},{v:fmtMoney(totTot),c:'Q'}].forEach(function(t){
-    var cell = ws.getCell(t.c+totRow.number);
-    cell.value = t.v;
-    cell.font = {bold:true,color:{argb:'FF'+BLANCO}};
-    cell.fill = fill(AZUL_MED);
-    cell.alignment = {horizontal:'right',vertical:'middle'};
-    cell.border = borde();
-  });
-
-  // Download
-  wb.xlsx.writeBuffer().then(function(buffer){
-    var blob = new Blob([buffer],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
-    var a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'Pedido_Facturacion_'+new Date().toISOString().slice(0,10)+'.xlsx';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  });
+  area.style.display='block';
+  document.querySelectorAll('.app').forEach(e=>e.style.display='none');
+  document.getElementById('modal-pedido-fact').classList.remove('open');
+  window.print();
+  document.querySelectorAll('.app').forEach(e=>e.style.display='');
+  area.style.display='none';
+  area.innerHTML='';
 }
 
 
@@ -1295,7 +1288,9 @@ function renderReporte(){
   const desde=document.getElementById("rpt-desde").value;
   const hasta=document.getElementById("rpt-hasta").value;
   const finca=document.getElementById("rpt-finca").value;
-  let data=consumos.filter(c=>{
+  // Combinar históricos + nuevos
+  const todosConsumos = consumosHistoricos.concat(consumos);
+  let data=todosConsumos.filter(c=>{
     if(cli&&c.cliente!==cli) return false;
     if(desde&&c.fecha<desde) return false;
     if(hasta&&c.fecha>hasta) return false;
