@@ -578,7 +578,16 @@ const ahora = new Date();
 document.getElementById("rpt-desde").value = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString().split("T")[0];
 document.getElementById("rpt-hasta").value = today;
 
-const SALDOS_BASE = {"MAGU SOLUTION S.A.S.":0,"Bladimir Martinez":0,"Victor Pinanjota":0,"SIDIMEC INGENIERIA":0,"Efrain Imbaquingo":0,"PROAGROMAQU S.A.S":0,"CORA REFRIGERACION":0};
+// Saldos históricos al momento de migrar a la app (calculados desde el Excel)
+const SALDOS_BASE = {
+  "MAGU SOLUTION S.A.S.": -147,
+  "Bladimir Martinez":    -42,
+  "Victor Pinanjota":     1,
+  "SIDIMEC INGENIERIA":   -37,
+  "Efrain Imbaquingo":    -98,
+  "PROAGROMAQU S.A.S":    6,
+  "CORA REFRIGERACION":   6
+};
 
 function getSaldo(n){
   const base = SALDOS_BASE[n] !== undefined ? SALDOS_BASE[n] : 0;
@@ -652,11 +661,14 @@ async function cargarDatosCloud(){
     prefacturas.length = 0;
     facturas.length = 0;
 
+    // Solo cargar registros NUEVOS (creados desde la app, no históricos del Excel)
     if(Array.isArray(cons)) cons.forEach(x=>{
-      consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:(x.fecha||'').toString().slice(0,10),obs:x.obs||''});
+      if(parseInt(x.id) >= 352)
+        consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:(x.fecha||'').toString().slice(0,10),obs:x.obs||''});
     });
     if(Array.isArray(pfs)) pfs.forEach(p=>{
-      prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio,precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
+      if(parseInt(p.id) >= 52)
+        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio,precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
     });
     if(Array.isArray(facts)) facts.forEach(f=>{
       facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago',fechaPago:f.fechaPago||''});
