@@ -664,17 +664,24 @@ async function cargarDatosCloud(){
     });
     // Solo cargar prefacturas nuevas (PF#52 en adelante)
     if(Array.isArray(pfs)) pfs.forEach(p=>{
-      if(parseInt(p.id) >= 52)
-        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
+      if(parseInt(p.id) >= 52){
+        // Normalizar precioUnit: manejar coma decimal y valores como 1717 en vez de 1.717
+        var pu = parseFloat(String(p.precioUnit||'').replace(',','.'));
+        if(isNaN(pu)||pu===0) pu=1.717;
+        if(pu>100) pu=pu/1000;
+        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
+      }
     });
     // Solo cargar facturas nuevas (npref >= 52 y <= 9999) sin duplicar y sin pagadas
     if(Array.isArray(facts)) facts.forEach(f=>{
       const npref = parseInt(f.npref||0);
       const estado = f.estado||'pendiente_pago';
-      // Solo npref válidos (52-9999), no pagadas, sin duplicar
       if(npref >= 52 && npref <= 9999 && estado !== 'pagado'){
         if(!facturas.find(x=>parseInt(x.npref)===npref)){
-          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
+          var pu = parseFloat(String(f.precioUnit||'').replace(',','.'));
+          if(isNaN(pu)||pu===0) pu=1.717;
+          if(pu>100) pu=pu/1000;
+          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
         }
       }
     });
