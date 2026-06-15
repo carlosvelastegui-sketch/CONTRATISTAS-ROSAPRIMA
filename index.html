@@ -603,47 +603,15 @@ function guardarLocalStorage(){
   } catch(e){ console.error('localStorage error:', e); }
 }
 
-const APP_VERSION = '2026061401'; // Cambia esto para limpiar localStorage
+const APP_VERSION = '2026061402'; // Cambia esto para limpiar localStorage
 function cargarLocalStorage(){
   try {
-    // Version check - clear old data if version changed
-    const savedVersion = localStorage.getItem('rosaprima_version');
-    if(savedVersion !== APP_VERSION){
-      localStorage.removeItem('rosaprima_facturas_estados');
-      localStorage.removeItem('rosaprima_new_consumos');
-      localStorage.removeItem('rosaprima_new_prefacturas');
-      localStorage.setItem('rosaprima_version', APP_VERSION);
-      console.log('✓ Cache limpiado por nueva versión');
-      return;
-    }
-    // Restaurar estados de facturas (solo pagado)
-    const est = localStorage.getItem('rosaprima_facturas_estados');
-    if(est){
-      const estados = JSON.parse(est);
-      facturas.forEach(f=>{
-        if(estados[f.id] && estados[f.id].estado==='pagado'){
-          Object.assign(f, estados[f.id]);
-        }
-      });
-      console.log('✓ Estados de facturas restaurados');
-    }
-    // Restaurar nuevos consumos (solo id >= 352)
-    const newCons = localStorage.getItem('rosaprima_new_consumos');
-    if(newCons){
-      JSON.parse(newCons).forEach(x=>{
-        if(x.id>=352 && !consumos.find(c=>c.id===x.id)) consumos.push(x);
-      });
-    }
-    // Restaurar nuevas prefacturas (solo id >= 52)
-    const newPFs = localStorage.getItem('rosaprima_new_prefacturas');
-    if(newPFs){
-      JSON.parse(newPFs).forEach(p=>{
-        if(p.id>=52 && !prefacturas.find(x=>x.id===p.id)){
-          prefacturas.push(p);
-          if(!facturas.find(f=>f.npref===p.id)) agregarFacturaPendiente(p);
-        }
-      });
-    }
+    // Limpiar todo el cache local - Google Sheets es la fuente única de datos
+    localStorage.removeItem('rosaprima_facturas_estados');
+    localStorage.removeItem('rosaprima_new_consumos');
+    localStorage.removeItem('rosaprima_new_prefacturas');
+    localStorage.setItem('rosaprima_version', APP_VERSION);
+    console.log('✓ Cache local limpiado - datos vienen de Google Sheets');
   } catch(e){ console.error('cargarLocalStorage error:', e); }
 }
 
@@ -679,30 +647,19 @@ async function cargarDatosCloud(){
       apiGet('getPrefacturas'),
       apiGet('getFacturas')
     ]);
+    // Limpiar arrays antes de cargar desde la nube (evitar duplicados)
+    consumos.length = 0;
+    prefacturas.length = 0;
+    facturas.length = 0;
+
     if(Array.isArray(cons)) cons.forEach(x=>{
-      if(!consumos.find(c=>String(c.id)===String(x.id) && c.cliente===x.cliente && c.fecha===x.fecha))
-        consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:x.fecha||'',obs:x.obs||''});
+      consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:(x.fecha||'').toString().slice(0,10),obs:x.obs||''});
     });
     if(Array.isArray(pfs)) pfs.forEach(p=>{
-      if(p.id>=52 && !prefacturas.find(x=>String(x.id)===String(p.id)))
-        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio,precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
+      prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio,precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
     });
     if(Array.isArray(facts)) facts.forEach(f=>{
-      const fid = parseInt(f.npref||f.id||0);
-      // Update payment status on existing historical facturas
-      const existing = facturas.find(x=>
-        x.factura && f.factura && x.factura===String(f.factura)
-      );
-      if(existing && f.estado==='pagado'){
-        existing.estado='pagado';
-        existing.valorPagado=parseFloat(f.valorPagado)||0;
-        existing.retencion=parseFloat(f.retencion)||0;
-        existing.comprobante=f.comprobante||'';
-        existing.fechaPago=f.fechaPago||'';
-      } else if(!existing && fid>=52){
-        // Only add new facturas from app (id>=52), never historical
-        facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago'});
-      }
+      facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago',fechaPago:f.fechaPago||''});
     });
     renderDash();
     renderControl();
