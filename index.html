@@ -607,7 +607,7 @@ function guardarLocalStorage(){
   } catch(e){ console.error('localStorage error:', e); }
 }
 
-const APP_VERSION = '2026061301'; // Cambia esto para limpiar localStorage
+const APP_VERSION = '2026061401'; // Cambia esto para limpiar localStorage
 function cargarLocalStorage(){
   try {
     // Version check - clear old data if version changed
@@ -652,7 +652,7 @@ function cargarLocalStorage(){
 }
 
 // ── API Google Sheets (JSONP — sin CORS) ──────────────────
-const API_URL = "https://script.google.com/macros/s/AKfycbxnLzsGmKxH_ePCXAGjGQ6_Wvo4ACzgNwYJjuUsXnzc_f4zvnV4v7FfPG_Eq7amWtBh/exec";
+const API_URL = "https://script.google.com/macros/s/AKfycbytxM8cTHc7saSXO8X2CJZVXo9tWWlarby1i4z85VBzO_7ftc-lvcVQ_9Sk50jV5bg/exec";
 
 function jsonp(params){
   return new Promise(function(resolve){
