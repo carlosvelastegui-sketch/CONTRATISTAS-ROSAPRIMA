@@ -672,7 +672,7 @@ async function cargarDatosCloud(){
         if(!isNaN(pu) && pu > 100) pu = pu / 1000;
         if(isNaN(pu)||pu===0) pu=1.717;
         if(pu>100) pu=pu/1000;
-        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
+        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
       }
     });
     // Solo cargar facturas nuevas (npref >= 52 y <= 9999) sin duplicar y sin pagadas
@@ -687,7 +687,7 @@ async function cargarDatosCloud(){
           if(!isNaN(pu) && pu > 100) pu = pu / 1000;
           if(isNaN(pu)||pu===0) pu=1.717;
           if(pu>100) pu=pu/1000;
-          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
+          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:parseNum(f.subtotal)||0,iva:parseNum(f.iva)||0,total:parseNum(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
         }
       }
     });
@@ -701,8 +701,18 @@ async function cargarDatosCloud(){
 
 
 
-function fmt(n){return "$"+parseFloat(n).toFixed(2).replace('.',',');}
-function fmtNum(n){return parseFloat(n).toFixed(4).replace('.',',');}
+function parseNum(v){
+  if(v===null||v===undefined||v==='') return 0;
+  var s=String(v).trim();
+  // Si tiene coma como miles (ej: "252,399") y punto como decimal -> quitar comas
+  if(/^\d{1,3}(,\d{3})*(\.\d+)?$/.test(s)) s=s.replace(/,/g,'');
+  // Si tiene coma como decimal (ej: "252,39") -> reemplazar por punto
+  else if(/^\d+,\d+$/.test(s)) s=s.replace(',','.');
+  var n=parseFloat(s);
+  return isNaN(n)?0:n;
+}
+function fmt(n){return "$"+parseNum(n).toFixed(2).replace('.',',');}
+function fmtNum(n){return parseNum(n).toFixed(4).replace('.',',');}
 function sh(s,n=22){return s&&s.length>n?s.slice(0,n)+"…":s;}
 function fb(f){return '<span style="background:'+( FC[f]||"#E6F1FB")+';color:'+(FT[f]||"#185FA5")+';padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600">'+f+'</span>';}
 
@@ -1064,9 +1074,9 @@ function generarPedido(){
       if(!isNaN(n) && n > 100) n = n / 1000;
       return isNaN(n) ? 1.717 : n;
     })(f.precioUnit);
-    const sub = parseFloat((parseFloat(f.subtotal)||f.qty*precioU).toFixed(2));
-    const iva = parseFloat((parseFloat(f.iva)||sub*0.15).toFixed(2));
-    const tot = parseFloat((parseFloat(f.total)||sub+iva).toFixed(2));
+    const sub = parseFloat((parseNum(f.subtotal)||f.qty*precioU).toFixed(2));
+    const iva = parseFloat((parseNum(f.iva)||sub*0.15).toFixed(2));
+    const tot = parseFloat((parseNum(f.total)||sub+iva).toFixed(2));
 
     return {f, cli, porFinca, precioU, sub, iva, tot};
   });
@@ -1179,9 +1189,9 @@ function imprimirPedido(){
     consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
     if(!consFact.length) porFinca['R1']=f.qty;
     const precioU = normalizarPrecio(f.precioUnit);
-    const sub = parseFloat((parseFloat(f.subtotal)||f.qty*precioU).toFixed(2));
-    const iva = parseFloat((parseFloat(f.iva)||sub*0.15).toFixed(2));
-    const tot = parseFloat((parseFloat(f.total)||sub+iva).toFixed(2));
+    const sub = parseFloat((parseNum(f.subtotal)||f.qty*precioU).toFixed(2));
+    const iva = parseFloat((parseNum(f.iva)||sub*0.15).toFixed(2));
+    const tot = parseFloat((parseNum(f.total)||sub+iva).toFixed(2));
     totSub+=sub; totIva+=iva; totTot+=tot;
     const bg = i%2===0?'white':'#f0f6fe';
     return `<tr style="background:${bg};border-bottom:1px solid #e2e6ed">
