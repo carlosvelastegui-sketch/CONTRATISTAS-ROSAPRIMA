@@ -725,6 +725,16 @@ async function cargarDatosCloud(){
     if(Array.isArray(facts)) facts.forEach(f=>{
       facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago',fechaPago:f.fechaPago||''});
     });
+
+    // Aplicar facturaMap a todas las facturas históricas (PF#1-51)
+    // para que aparezcan con número de factura y estado correcto
+    facturas.forEach(function(f){
+      const npref = parseInt(f.npref||0);
+      if(npref >= 1 && npref <= 51 && facturaMap[npref]){
+        f.factura = facturaMap[npref];
+        f.estado = 'pagado';
+      }
+    });
     renderDash();
     renderControl();
     console.log('✓ Datos cargados desde la nube.');
