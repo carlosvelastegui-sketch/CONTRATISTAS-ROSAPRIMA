@@ -548,71 +548,11 @@ const consumosHistoricos = [{"id": 1, "cliente": "MAGU SOLUTION S.A.S.", "qty": 
 let facturas = []; // datos vienen de Google Sheets
 let nextFactId = 76;
 
-// Apply real invoice numbers to historical prefacturas
-const facturaMap = {
-  1:  "001-003-000086632",
-  2:  "001-003-000086632",
-  3:  "001-003-000086447",
-  4:  "001-003-000086446",
-  5:  "CONSUMIDOR FINAL",
-  6:  "001-003-000087314",
-  7:  "HISTORICO",
-  8:  "NO REQUIERE",
-  9:  "001-003-000088943",
-  10: "001-003-000086631",
-  11: "001-003-000086631",
-  12: "001-003-000087249",
-  13: "001-003-000087115",
-  14: "001-003-000087250",
-  15: "001-003-000087627",
-  16: "001-003-000087629",
-  17: "001-003-000087251",
-  18: "001-003-000087630",
-  19: "001-003-000087631",
-  20: "001-003-000087632",
-  21: "001-003-000087876",
-  22: "001-003-000087877",
-  23: "001-003-000088419",
-  24: "001-003-000089820",
-  25: "001-003-000088420",
-  26: "001-003-000088420",
-  27: "001-003-000088419",
-  28: "001-003-000088702",
-  29: "001-003-000088702",
-  30: "HISTORICO",
-  31: "001-003-000088703",
-  32: "001-003-000090067",
-  33: "001-003-000090068",
-  34: "001-003-000089820",
-  35: "001-003-000090107",
-  36: "001-003-000090109",
-  37: "001-003-000090126",
-  38: "001-003-000090107",
-  39: "CONSUMIDOR FINAL",
-  40: "001-005-000001237",
-  41: "001-005-000001237",
-  42: "001-005-000001236",
-  43: "001-005-000001344",
-  44: "001-005-000001238",
-  45: "HISTORICO",
-  46: "001-005-000001344",
-  47: "HISTORICO",
-  48: "HISTORICO",
-  49: "001-005-000003784",
-  50: "001-005-000003833",
-  51: "HISTORICO"
-};
-prefacturas.forEach(function(p){
-  if(p.id && facturaMap[p.id] && !p.factura){
-    p.factura = facturaMap[p.id];
-    p.estado = 'facturado';
-  } else if(p.id && !facturaMap[p.id] && !p.factura){
-    // Historical without known invoice - mark as facturado (they were settled)
-    p.factura = 'HISTORICO';
-    p.estado = 'facturado';
-  }
-});
-let nextPFid = 52;
+// PF#52 = única prefactura nueva registrada (MAGU SOLUTION S.A.S.)
+// PF#53 en adelante = nuevas desde hoy
+// Los históricos (PF#1-51) no se muestran ni gestionan
+
+let nextPFid = 53; // PF#52 ya asignada a MAGU SOLUTION S.A.S.
 let nextCONid = 352; // IDs de nuevos consumos empiezan en 352
 
 
@@ -721,19 +661,17 @@ async function cargarDatosCloud(){
       if(parseInt(x.id) >= 352)
         consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:(x.fecha||'').toString().slice(0,10),obs:x.obs||''});
     });
+    // Solo cargar prefacturas nuevas (PF#52 en adelante)
     if(Array.isArray(pfs)) pfs.forEach(p=>{
       if(parseInt(p.id) >= 52)
-        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio,precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
+        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
     });
-    // Solo cargar FACTURAS NUEVAS desde Google Sheets (id >= 52) sin duplicar
+    // Solo cargar facturas nuevas (npref >= 52) sin duplicar
     if(Array.isArray(facts)) facts.forEach(f=>{
-      const fid = parseInt(f.id)||0;
       const npref = parseInt(f.npref||0);
-      // Solo cargar facturas nuevas (npref >= 52) y evitar duplicados por npref
-      if(npref >= 52 || (fid >= 52 && npref === 0)){
-        // Verificar que no exista ya una factura con el mismo npref
-        if(!facturas.find(x=>String(x.npref)===String(f.npref) && f.npref)){
-          facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago',fechaPago:f.fechaPago||''});
+      if(npref >= 52){
+        if(!facturas.find(x=>parseInt(x.npref)===npref)){
+          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago',fechaPago:f.fechaPago||''});
         }
       }
     });
