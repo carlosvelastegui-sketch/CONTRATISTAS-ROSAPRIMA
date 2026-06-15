@@ -666,12 +666,14 @@ async function cargarDatosCloud(){
       if(parseInt(p.id) >= 52)
         prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:parseFloat(p.precioUnit)||1.717,sub:parseFloat(p.sub)||0,iva:parseFloat(p.iva)||0,total:parseFloat(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
     });
-    // Solo cargar facturas nuevas (npref >= 52) sin duplicar
+    // Solo cargar facturas nuevas (npref >= 52 y <= 9999) sin duplicar y sin pagadas
     if(Array.isArray(facts)) facts.forEach(f=>{
       const npref = parseInt(f.npref||0);
-      if(npref >= 52){
+      const estado = f.estado||'pendiente_pago';
+      // Solo npref válidos (52-9999), no pagadas, sin duplicar
+      if(npref >= 52 && npref <= 9999 && estado !== 'pagado'){
         if(!facturas.find(x=>parseInt(x.npref)===npref)){
-          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:f.estado||'pendiente_pago',fechaPago:f.fechaPago||''});
+          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:parseFloat(f.precioUnit)||1.717,subtotal:parseFloat(f.subtotal)||0,iva:parseFloat(f.iva)||0,total:parseFloat(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
         }
       }
     });
