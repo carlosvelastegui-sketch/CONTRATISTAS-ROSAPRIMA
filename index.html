@@ -1211,7 +1211,8 @@ function imprimirPedido(){
 
   // Data rows
   var totSub=0,totIva=0,totTot=0;
-  var moneyFmt = '_-[$$-409]* #,##0.00_-';
+  var moneyFmt = '0.00';
+  function fmtMoney(v){ return '$ '+parseFloat(v).toFixed(2); }
 
   selected.forEach(function(f,idx){
     var cli = clientes.find(function(c){return c.nombre===f.cliente;})||{};
@@ -1231,7 +1232,8 @@ function imprimirPedido(){
       f.qty,
       porFinca['R1']||null, porFinca['R2']||null, porFinca['R3']||null,
       porFinca['R4']||null, porFinca['R5']||null, porFinca['R6']||null,
-      f.servicio||'Almuerzo Operativo', precioU, sub, iva, tot
+      f.servicio||'Almuerzo Operativo',
+      fmtMoney(precioU), fmtMoney(sub), fmtMoney(iva), fmtMoney(tot)
     ]);
     row.height = 18;
     row.eachCell(function(cell,cn){
@@ -1239,7 +1241,7 @@ function imprimirPedido(){
       cell.border = borde();
       cell.alignment = {vertical:'middle'};
       if(cn>=7&&cn<=12){ cell.alignment={horizontal:'center',vertical:'middle'}; }
-      if(cn>=14&&cn<=17){ cell.numFmt=moneyFmt; cell.alignment={horizontal:'right',vertical:'middle'}; }
+      if(cn>=14&&cn<=17){ cell.alignment={horizontal:'right',vertical:'middle'}; }
     });
   });
 
@@ -1253,10 +1255,9 @@ function imprimirPedido(){
   tc.fill = fill(AZUL_MED);
   tc.alignment = {horizontal:'right',vertical:'middle'};
   tc.border = borde();
-  [{v:parseFloat(totSub.toFixed(2)),c:'O'},{v:parseFloat(totIva.toFixed(2)),c:'P'},{v:parseFloat(totTot.toFixed(2)),c:'Q'}].forEach(function(t){
+  [{v:fmtMoney(totSub),c:'O'},{v:fmtMoney(totIva),c:'P'},{v:fmtMoney(totTot),c:'Q'}].forEach(function(t){
     var cell = ws.getCell(t.c+totRow.number);
     cell.value = t.v;
-    cell.numFmt = moneyFmt;
     cell.font = {bold:true,color:{argb:'FF'+BLANCO}};
     cell.fill = fill(AZUL_MED);
     cell.alignment = {horizontal:'right',vertical:'middle'};
