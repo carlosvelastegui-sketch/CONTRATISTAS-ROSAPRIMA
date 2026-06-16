@@ -678,12 +678,12 @@ async function cargarDatosCloud(){
         prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
       }
     });
-    // Solo cargar facturas nuevas (npref >= 52 y <= 9999) sin duplicar y sin pagadas
+    // Cargar TODAS las facturas (históricas y nuevas) sin duplicar
     if(Array.isArray(facts)) facts.forEach(f=>{
       const npref = parseInt(f.npref||0);
       const estado = f.estado||'pendiente_pago';
-      if(npref >= 52 && npref <= 9999 && estado !== 'pagado'){
-        if(!facturas.find(x=>parseInt(x.npref)===npref)){
+      if(!facturas.find(x=>parseInt(x.npref)===npref)){
+        if(true){
           var puStr = String(f.precioUnit||'').trim();
           if(/^\d+,\d+$/.test(puStr)) puStr = puStr.replace(',','.');
           var pu = parseFloat(puStr);
