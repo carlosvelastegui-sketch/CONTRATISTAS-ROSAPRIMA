@@ -996,23 +996,15 @@ function abrirModalPago(id){
 
 function guardarPago(){
   const factura=document.getElementById("mpago-factura").value.trim();
-  // Si no hay número de factura, guardar pago parcial pero mantener pendiente
+  // Factura number is optional - can be added later
   const x=facturas.find(f=>f.id===pagoId); if(!x) return;
   x.valorPagado=parseFloat(document.getElementById("mpago-valor").value)||0;
   x.retencion=parseFloat(document.getElementById("mpago-retencion").value)||0;
   x.comprobante=document.getElementById("mpago-comprobante").value.trim();
   x.fechaPago=document.getElementById("mpago-fecha").value;
   x.obs=document.getElementById("mpago-obs").value.trim();
-  x.factura=factura;
-  // Solo cerrar la prefactura si se ingresó el número de factura
-  if(factura){
-    x.estado="pagado";
-    apiPost({action:'updateFactura',id:x.id,valorPagado:x.valorPagado,retencion:x.retencion,factura:x.factura,comprobante:x.comprobante,estado:'pagado',fechaPago:x.fechaPago,refPago:x.refPago});
-  } else {
-    x.estado="pendiente_pago";
-    alert("⚠ El pago fue guardado pero la prefactura permanece pendiente hasta que se ingrese el N° de factura emitida.");
-    apiPost({action:'updateFactura',id:x.id,valorPagado:x.valorPagado,retencion:x.retencion,factura:'',comprobante:x.comprobante,estado:'pendiente_pago',fechaPago:x.fechaPago,refPago:x.refPago});
-  }
+  x.estado="pagado";
+  apiPost({action:'updateFactura',id:x.id,refPago:x.refPago,valorPagado:x.valorPagado,retencion:x.retencion,factura:x.factura,comprobante:x.comprobante,estado:x.estado,fechaPago:x.fechaPago});
   guardarLocalStorage();
   document.getElementById("modal-pago").classList.remove("open");
   renderControl();
