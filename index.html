@@ -317,7 +317,7 @@ tbody tr:hover td{background:#f8f9fb}
               <select id="filtro-ctrl" onchange="renderControl()" style="width:auto;padding:6px 10px;font-size:12px">
                 <option value="">Todas</option>
                 <option value="pagado">Pagadas</option>
-                <option value="pendiente_pago">Pendientes de pago</option>
+                <option value="pendiente_pago">Pendientes</option>
               </select>
             </div>
           </div>
@@ -959,7 +959,7 @@ function renderControl(){
       +'<td style="font-size:11px;color:#6b7694">'+(x.comprobante||"—")+'</td>'
       +'<td>'+(isPaid
         ?'<span class="badge badge-ok">Pagado</span>'
-        :'<span class="badge badge-pending">Pend. pago</span>')+'</td>'
+        :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
       +'<td>'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':"")+'</td>'
       +'</tr>';
   }).join("");
@@ -996,14 +996,20 @@ function abrirModalPago(id){
 
 function guardarPago(){
   const factura=document.getElementById("mpago-factura").value.trim();
-  // Factura number is optional - can be added later
   const x=facturas.find(f=>f.id===pagoId); if(!x) return;
   x.valorPagado=parseFloat(document.getElementById("mpago-valor").value)||0;
   x.retencion=parseFloat(document.getElementById("mpago-retencion").value)||0;
   x.comprobante=document.getElementById("mpago-comprobante").value.trim();
   x.fechaPago=document.getElementById("mpago-fecha").value;
   x.obs=document.getElementById("mpago-obs").value.trim();
-  x.estado="pagado";
+  x.factura=factura;
+  // Solo marcar como pagado si tiene número de factura
+  if(factura){
+    x.estado="pagado";
+  } else {
+    x.estado="pendiente_pago";
+    alert("⚠ Los datos fueron guardados pero la prefactura permanece PENDIENTE hasta que ingrese el N° de factura emitida.");
+  }
   apiPost({action:'updateFactura',id:x.id,refPago:x.refPago,valorPagado:x.valorPagado,retencion:x.retencion,factura:x.factura,comprobante:x.comprobante,estado:x.estado,fechaPago:x.fechaPago});
   guardarLocalStorage();
   document.getElementById("modal-pago").classList.remove("open");
