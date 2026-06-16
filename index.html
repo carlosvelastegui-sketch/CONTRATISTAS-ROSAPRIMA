@@ -979,14 +979,14 @@ function abrirModalPago(id){
   document.getElementById("mpago-factura").value=x.factura;
   document.getElementById("mpago-fecha").value=new Date().toISOString().split("T")[0];
   document.getElementById("mpago-comprobante").value=x.refPago||"";
-  document.getElementById("mpago-valor").value=x.total.toFixed(2);
+  document.getElementById("mpago-valor").value=parseNum(x.total).toFixed(2);
   document.getElementById("mpago-retencion").value="0";
   document.getElementById("mpago-dif").value="0.00";
   document.getElementById("mpago-obs").value="";
   function calcDif(){
     const v=parseFloat(document.getElementById("mpago-valor").value)||0;
     const r=parseFloat(document.getElementById("mpago-retencion").value)||0;
-    const dif=parseFloat((v+r-x.total).toFixed(4));
+    const dif=parseFloat((v+r-parseNum(x.total)).toFixed(4));
     document.getElementById("mpago-dif").value=(dif>=0?"+":"")+dif;
   }
   document.getElementById("mpago-valor").oninput=calcDif;
