@@ -678,12 +678,12 @@ async function cargarDatosCloud(){
         prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
       }
     });
-    // Cargar TODAS las facturas (históricas y nuevas) sin duplicar
+    // Solo cargar facturas nuevas (npref >= 52 y <= 9999) sin duplicar y sin pagadas
     if(Array.isArray(facts)) facts.forEach(f=>{
       const npref = parseInt(f.npref||0);
       const estado = f.estado||'pendiente_pago';
-      if(!facturas.find(x=>parseInt(x.npref)===npref)){
-        if(true){
+      if(npref >= 52 && npref <= 9999 && estado !== 'pagado'){
+        if(!facturas.find(x=>parseInt(x.npref)===npref)){
           var puStr = String(f.precioUnit||'').trim();
           if(/^\d+,\d+$/.test(puStr)) puStr = puStr.replace(',','.');
           var pu = parseFloat(puStr);
@@ -996,15 +996,23 @@ function abrirModalPago(id){
 
 function guardarPago(){
   const factura=document.getElementById("mpago-factura").value.trim();
-  // Factura number is optional - can be added later
+  // Si no hay número de factura, guardar pago parcial pero mantener pendiente
   const x=facturas.find(f=>f.id===pagoId); if(!x) return;
   x.valorPagado=parseFloat(document.getElementById("mpago-valor").value)||0;
   x.retencion=parseFloat(document.getElementById("mpago-retencion").value)||0;
   x.comprobante=document.getElementById("mpago-comprobante").value.trim();
   x.fechaPago=document.getElementById("mpago-fecha").value;
   x.obs=document.getElementById("mpago-obs").value.trim();
-  x.estado="pagado";
-  apiPost({action:'registrarPago',id:x.id,cliente:x.cliente,valorPagado:x.valorPagado,retencion:x.retencion,comprobante:x.comprobante,factura:x.factura,estado:'pagado'});
+  x.factura=factura;
+  // Solo cerrar la prefactura si se ingresó el número de factura
+  if(factura){
+    x.estado="pagado";
+    apiPost({action:'updateFactura',id:x.id,valorPagado:x.valorPagado,retencion:x.retencion,factura:x.factura,comprobante:x.comprobante,estado:'pagado',fechaPago:x.fechaPago,refPago:x.refPago});
+  } else {
+    x.estado="pendiente_pago";
+    alert("⚠ El pago fue guardado pero la prefactura permanece pendiente hasta que se ingrese el N° de factura emitida.");
+    apiPost({action:'updateFactura',id:x.id,valorPagado:x.valorPagado,retencion:x.retencion,factura:'',comprobante:x.comprobante,estado:'pendiente_pago',fechaPago:x.fechaPago,refPago:x.refPago});
+  }
   guardarLocalStorage();
   document.getElementById("modal-pago").classList.remove("open");
   renderControl();
