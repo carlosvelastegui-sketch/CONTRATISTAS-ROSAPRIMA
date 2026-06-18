@@ -214,7 +214,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="resumen-box" id="resumen-consumo"></div>
           <div class="form-group" style="margin-top:12px"><label>Observaciones</label><input type="text" id="c-obs" placeholder="Opcional..."></div>
           <div class="actions">
-            <button class="btn btn-primary" onclick="registrarConsumo()"><i class="ti ti-check"></i> Registrar consumo</button>
+            <button class="btn btn-primary" id="btn-registrar-consumo" onclick="registrarConsumo()"><i class="ti ti-check"></i> Registrar consumo</button>
             <button class="btn" onclick="limpiarConsumo()"><i class="ti ti-x"></i> Limpiar</button>
           </div>
         </div>
@@ -287,7 +287,7 @@ tbody tr:hover td{background:#f8f9fb}
             </div>
             <div class="pf-doc" id="pf-preview"></div>
             <div class="actions">
-              <button class="btn btn-success" onclick="confirmarPF()"><i class="ti ti-check"></i> Confirmar y registrar</button>
+              <button class="btn btn-success" id="btn-confirmar-pf" onclick="confirmarPF()"><i class="ti ti-check"></i> Confirmar y registrar</button>
               <button class="btn" onclick="irPS1()"><i class="ti ti-arrow-left"></i> Volver</button>
             </div>
           </div>
@@ -801,7 +801,7 @@ function recalcCons(){
   r.innerHTML='<div class="r-titulo">Resumen</div>'+Object.entries(pf).map(([f,q])=>'<div class="r-linea"><span>'+fb(f)+' <span style="margin-left:6px">'+q+' almuerzo'+(q>1?"s":"")+'</span></span><span style="font-weight:600">'+q+'</span></div>').join("")+'<div class="r-total"><span>Total a descontar</span><span>'+total+' almuerzos</span></div>'+(n?'<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:8px;padding:8px 0;border-top:1px solid #f0f2f5"><span style="color:#6b7694">Saldo después del consumo</span><span style="font-weight:700;color:'+(tras>=0?"#3B6D11":"#A32D2D")+'">'+tras+' almuerzos'+(tras<0?" ⚠ INSUFICIENTE":"")+'</span></div>':"");
 }
 
-function registrarConsumo(){
+async function registrarConsumo(){
   const n=document.getElementById("c-cliente").value;
   if(!n){alert("Selecciona un contratista");return;}
   const lineas=getLineas();
@@ -811,15 +811,32 @@ function registrarConsumo(){
   if(total>saldo&&!confirm("⚠ Saldo insuficiente\nSaldo: "+saldo+" · Consumiendo: "+total+"\n\n¿Registrar de todas formas?")) return;
   const fecha=document.getElementById("c-fecha").value;
   const obs=document.getElementById("c-obs").value;
-  lineas.forEach(l=>{
-    const nc={id:nextCONid++,cliente:n,qty:l.qty,finca:l.finca,fecha,obs};
-    consumos.push(nc);
-    apiPost({action:'saveConsumo',...nc});
+
+  const btn = document.getElementById('btn-registrar-consumo');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Guardando en la nube...'; }
+
+  const pendientes = lineas.map(l=>({id:nextCONid++,cliente:n,qty:l.qty,finca:l.finca,fecha,obs}));
+  const guardados = [];
+  try {
+    for(const nc of pendientes){
+      const r = await apiPost({action:'saveConsumo',...nc});
+      if(!r || r.error) throw new Error((r && r.error) || ('Sin respuesta del servidor al guardar finca '+nc.finca));
+      consumos.push(nc);
+      guardados.push(nc);
+    }
     guardarLocalStorage();
-  });
-  mostrarSaldo();
-  alert("✓ Consumo registrado\n"+n+"\nTotal: "+total+" almuerzos\nSaldo restante: "+getSaldo(n));
-  limpiarConsumo();
+    mostrarSaldo();
+    alert("✓ Consumo registrado\n"+n+"\nTotal: "+total+" almuerzos\nSaldo restante: "+getSaldo(n));
+    limpiarConsumo();
+  } catch(err) {
+    console.error('Error al guardar consumo:', err);
+    const faltan = pendientes.length - guardados.length;
+    alert("⚠ El consumo NO se guardó completamente en la nube.\n\nMotivo: "+err.message+"\n\nLíneas guardadas: "+guardados.length+" de "+pendientes.length+"\n\nNO recargues la página. Vuelve a presionar 'Registrar consumo' (puedes dejar solo las fincas que faltaron).");
+    guardarLocalStorage();
+    mostrarSaldo();
+  } finally {
+    if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Registrar consumo'; }
+  }
 }
 
 function limpiarConsumo(){
@@ -877,6 +894,24 @@ function irPS2(){
   document.getElementById("ps3").className="step";
 }
 
+// Calcula el desglose REAL por finca a partir de los consumos registrados
+// entre la fecha de la última prefactura/factura del cliente (exclusiva) y
+// la fecha de la prefactura/factura actual (inclusiva). Si no hay consumos
+// reales en ese rango, NO se asigna ninguna finca por defecto (antes se
+// forzaba todo a "R1", lo cual era incorrecto).
+function getFincaBreakdown(cliente, fechaHasta){
+  const todosC = consumosHistoricos.concat(consumos);
+  const anteriores = facturas
+    .filter(x=>x.cliente===cliente && x.fecha && x.fecha < fechaHasta)
+    .map(x=>x.fecha)
+    .sort();
+  const fechaDesde = anteriores.length ? anteriores[anteriores.length-1] : '0000-01-01';
+  const consFact = todosC.filter(x=>x.cliente===cliente && x.fecha>fechaDesde && x.fecha<=fechaHasta);
+  const porFinca = {};
+  consFact.forEach(x=>{ const f=x.finca||'R1'; porFinca[f]=(porFinca[f]||0)+x.qty; });
+  return porFinca;
+}
+
 function generarHTMLPF(pf, cl){
   return '<div class="pf-print-header"><div><img src="'+LOGO_B64+'" style="height:50px;margin-bottom:6px"><div class="hanaska-bar" style="width:120px"></div></div><div style="text-align:right"><div class="pf-num">PRE-FACTURA N° '+String(pf.id).padStart(5,"0")+'</div><div style="font-size:11px;color:#6b7694">Fecha: '+pf.fecha+'</div><div style="font-size:11px;color:#6b7694;margin-top:4px">Ref. pago: '+(pf.refPago||"—")+'</div></div></div>'
   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">'
@@ -887,29 +922,42 @@ function generarHTMLPF(pf, cl){
   +'<div class="pf-print-footer"><div class="hanaska-bar" style="width:100%;margin-bottom:8px"></div>Elaborado por: <strong>Ing. Carlos Velástegui</strong> · Administrador · Hanaska<br><span style="font-size:10px">Documento generado el '+new Date().toLocaleDateString("es-EC")+'</span></div>';
 }
 
-function confirmarPF(){
-  prefacturas.push({...curPF});
-  agregarFacturaPendiente(curPF);
-  apiPost({action:'savePreFact',...curPF});
-  apiPost({action:'saveFactura',...facturas[facturas.length-1]});
-  guardarLocalStorage();
-  nextPFid++;
-  ["ppaso1","ppaso2","ppaso3"].forEach((p,i)=>document.getElementById(p).style.display=i===2?"":"none");
-  document.getElementById("ps1").className="step done";
-  document.getElementById("ps2").className="step done";
-  document.getElementById("ps3").className="step active";
-  document.getElementById("conf-msg").textContent="N° "+String(curPF.id).padStart(5,"0")+" · "+curPF.cliente+" · "+curPF.qty+" almuerzos · "+fmt(curPF.total);
+async function confirmarPF(){
+  const btn = document.getElementById('btn-confirmar-pf');
+  const msg = document.getElementById('conf-msg');
+  if(btn){ btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Guardando en la nube...'; }
+  if(msg) msg.textContent = 'Guardando, no recargues la página...';
+
+  try {
+    const r1 = await apiPost({action:'savePreFact',...curPF});
+    if(!r1 || r1.error) throw new Error((r1 && r1.error) || 'Sin respuesta del servidor al guardar la prefactura');
+
+    prefacturas.push({...curPF});
+    agregarFacturaPendiente(curPF);
+    const nuevaFactura = facturas[facturas.length-1];
+
+    const r2 = await apiPost({action:'saveFactura',...nuevaFactura});
+    if(!r2 || r2.error) throw new Error((r2 && r2.error) || 'Sin respuesta del servidor al guardar la factura');
+
+    guardarLocalStorage();
+    nextPFid++;
+    ["ppaso1","ppaso2","ppaso3"].forEach((p,i)=>document.getElementById(p).style.display=i===2?"":"none");
+    document.getElementById("ps1").className="step done";
+    document.getElementById("ps2").className="step done";
+    document.getElementById("ps3").className="step active";
+    if(msg) msg.textContent="✓ Guardado en la nube · N° "+String(curPF.id).padStart(5,"0")+" · "+curPF.cliente+" · "+curPF.qty+" almuerzos · "+fmt(curPF.total);
+  } catch(err) {
+    console.error('Error al guardar la prefactura:', err);
+    alert("⚠ La prefactura NO se guardó en la nube.\n\nMotivo: "+err.message+"\n\nNO recargues la página. Revisa tu conexión a internet y presiona 'Confirmar y registrar' de nuevo.");
+    if(msg) msg.textContent="⚠ No se guardó — vuelve a intentar (no refresques la página)";
+  } finally {
+    if(btn){ btn.disabled = false; btn.innerHTML = '<i class="ti ti-check"></i> Confirmar y registrar'; }
+  }
 }
 
 function imprimirPF(){
   const cl = clientes.find(c=>c.nombre===curPF.cliente)||{};
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
-  
-  // Get finca breakdown from consumos
-  const consFact = consumos.filter(x=>x.cliente===curPF.cliente && x.fecha===curPF.fecha);
-  const porFinca = {};
-  consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
-  if(!consFact.length) porFinca['R1']=curPF.qty;
 
   const precioU = parseFloat(curPF.precioUnit)||1.7217;
   const sub = parseFloat(curPF.sub)||parseFloat((curPF.qty*precioU).toFixed(4));
@@ -917,25 +965,23 @@ function imprimirPF(){
   const tot = parseFloat(curPF.total)||parseFloat((sub+iva).toFixed(4));
 
   const rows = [
-    ['HANASKA (Rosaprima)','','','','','','','','','','','','','','','',''],
-    ['PEDIDO DE FACTURACIÓN','','','','','Fecha:',hoy,'','','','','','','','','',''],
+    ['HANASKA (Rosaprima)','','','','','','','','',''],
+    ['PRE-FACTURA','','','','Fecha:',hoy,'','','',''],
     [],
-    ['Razón Social','RUC / Cédula','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','P. Unitario','Subtotal','IVA 15%','Total'],
+    ['Razón Social','RUC / Cédula','Dirección','Teléfono','Correo','Cant.','Servicio','P. Unitario','Subtotal','IVA 15%','Total'],
     [
       curPF.cliente, cl.ruc||'', cl.dir||'', cl.tel||'', cl.correo||'',
       curPF.qty,
-      porFinca['R1']||'', porFinca['R2']||'', porFinca['R3']||'',
-      porFinca['R4']||'', porFinca['R5']||'', porFinca['R6']||'',
       curPF.servicio||'Almuerzo Operativo', precioU, sub, iva, tot
     ],
-    ['','','','','','','','','','','','','','TOTALES', parseFloat(sub.toFixed(2)), parseFloat(iva.toFixed(2)), parseFloat(tot.toFixed(2))]
+    ['','','','','','','','TOTALES', parseFloat(sub.toFixed(2)), parseFloat(iva.toFixed(2)), parseFloat(tot.toFixed(2))]
   ];
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols'] = [{wch:28},{wch:16},{wch:20},{wch:14},{wch:24},{wch:7},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:5},{wch:20},{wch:12},{wch:12},{wch:10},{wch:12}];
+  ws['!cols'] = [{wch:28},{wch:16},{wch:20},{wch:14},{wch:24},{wch:7},{wch:20},{wch:12},{wch:12},{wch:10},{wch:12}];
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Pedido Facturación');
-  XLSX.writeFile(wb, 'Pedido_Fact_'+String(curPF.id).padStart(5,'0')+'_'+curPF.cliente.replace(/[^a-zA-Z0-9]/g,'_')+'.xlsx');
+  XLSX.utils.book_append_sheet(wb, ws, 'Prefactura');
+  XLSX.writeFile(wb, 'Prefactura_'+String(curPF.id).padStart(5,'0')+'_'+curPF.cliente.replace(/[^a-zA-Z0-9]/g,'_')+'.xlsx');
 }
 
 /* CONTROL */
@@ -1064,11 +1110,7 @@ function getPrecioPF(servicio, precioUnitRaw){
 
 function calcFilaPF(f){
   const cli  = clientes.find(c=>c.nombre===f.cliente)||{};
-  const todosC = consumosHistoricos.concat(consumos);
-  const consFact = todosC.filter(x=>x.cliente===f.cliente && x.fecha===f.fecha);
-  const porFinca = {};
-  consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
-  if(!Object.keys(porFinca).length) porFinca['R1'] = f.qty;
+  const porFinca = getFincaBreakdown(f.cliente, f.fecha);
   const precioU = getPrecioPF(f.servicio, f.precioUnit);
   const sub = parseFloat((f.qty * precioU).toFixed(4));
   const iva = parseFloat((sub * 0.15).toFixed(4));
