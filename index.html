@@ -239,19 +239,19 @@ tbody tr:hover td{background:#f8f9fb}
             <div class="form-row">
               <div class="form-group"><label>Servicio</label>
                 <select id="p-servicio" onchange="calcPF()">
-                  <option value="Almuerzo Operativo">Almuerzo Operativo — $1.717</option>
-                  <option value="Almuerzo Administrativo">Almuerzo Administrativo — $1.818</option>
-                  <option value="Almuerzo Vianda">Almuerzo Vianda — $1.9381</option>
-                  <option value="Merienda">Merienda — $1.717</option>
-                  <option value="Merienda Vianda">Merienda Vianda — $1.717</option>
-                  <option value="Desayuno Administrativo">Desayuno Administrativo — $1.3636</option>
-                  <option value="Desayuno Reforzado">Desayuno Reforzado — $1.3636</option>
-                  <option value="Desayunos">Desayunos — $0.6566</option>
-                  <option value="Desayuno Vianda">Desayuno Vianda — $0.88</option>
-                  <option value="Refrigerio R1">Refrigerio R1 — $0.6566</option>
-                  <option value="Refrigerio 2">Refrigerio 2 — $0.3536</option>
-                  <option value="Refrigerio 1 Vianda">Refrigerio 1 Vianda — $0.88</option>
-                  <option value="Refrigerio 2 Vianda">Refrigerio 2 Vianda — $0.5747</option>
+                  <option value="Almuerzo Operativo">Almuerzo Operativo — $1.7217</option>
+                  <option value="Almuerzo Administrativo">Almuerzo Administrativo — $1.8261</option>
+                  <option value="Almuerzo Vianda">Almuerzo Vianda — $1.9391</option>
+                  <option value="Merienda">Merienda — $1.7217</option>
+                  <option value="Merienda Vianda">Merienda Vianda — $1.7217</option>
+                  <option value="Desayuno Administrativo">Desayuno Administrativo — $1.3652</option>
+                  <option value="Desayuno Reforzado">Desayuno Reforzado — $1.3652</option>
+                  <option value="Desayunos">Desayunos — $0.6609</option>
+                  <option value="Desayuno Vianda">Desayuno Vianda — $0.6609</option>
+                  <option value="Refrigerio R1">Refrigerio R1 — $0.6609</option>
+                  <option value="Refrigerio 2">Refrigerio 2 — $0.3565</option>
+                  <option value="Refrigerio 1 Vianda">Refrigerio 1 Vianda — $0.6609</option>
+                  <option value="Refrigerio 2 Vianda">Refrigerio 2 Vianda — $0.3565</option>
                 </select>
               </div>
               <div class="form-group"><label>Fecha</label><input type="date" id="p-fecha"></div>
@@ -267,7 +267,7 @@ tbody tr:hover td{background:#f8f9fb}
             <div class="resumen-box">
               <div class="r-titulo">Resumen</div>
               <div class="r-linea"><span>Cantidad</span><span id="pc-qty">50</span></div>
-              <div class="r-linea"><span>Precio unitario (neto)</span><span id="pc-unit">$1.717</span></div>
+              <div class="r-linea"><span>Precio unitario (neto)</span><span id="pc-unit">$1.7217</span></div>
               <div class="r-linea"><span>Subtotal</span><span id="pc-sub">$86.00</span></div>
               <div class="r-linea"><span>IVA 15%</span><span id="pc-iva">$12.90</span></div>
               <div class="r-total"><span>Total</span><span id="pc-total">$98.90</span></div>
@@ -513,22 +513,22 @@ tbody tr:hover td{background:#f8f9fb}
 
 <script>
 const PRECIOS_SERVICIOS = {
-  "Almuerzo Operativo":          {neto: 1.717,  iva: 0.25755,  total: 1.98},
-  "Almuerzo Administrativo":    {neto: 1.818,  iva: 0.2727,   total: 2.10},
-  "Almuerzo Vianda":            {neto: 1.9381, iva: 0.290715, total: 2.23},
-  "Merienda":                   {neto: 1.717,  iva: 0.25755,  total: 1.98},
-  "Merienda Vianda":            {neto: 1.717,  iva: 0.25755,  total: 1.98},
-  "Desayuno Administrativo":    {neto: 1.3636, iva: 0.20454,  total: 1.57},
-  "Desayuno Reforzado":         {neto: 1.3636, iva: 0.20454,  total: 1.57},
-  "Desayuno Reforzado Vianda":  {neto: 1.3636, iva: 0.20454,  total: 1.57},
-  "Desayunos":                  {neto: 0.6566, iva: 0.09849,  total: 0.76},
-  "Desayuno Vianda":            {neto: 0.6566, iva: 0.09849,  total: 0.76},
-  "Refrigerio R1":              {neto: 0.6566, iva: 0.09849,  total: 0.76},
-  "Refrigerio 1 Vianda":        {neto: 0.6566, iva: 0.09849,  total: 0.76},
-  "Refrigerio 2":               {neto: 0.3536, iva: 0.05304,  total: 0.41},
-  "Refrigerio 2 Vianda":        {neto: 0.3536, iva: 0.05304,  total: 0.41}
+  "Almuerzo Operativo":          {neto: 1.7217, iva: 0.2583,  total: 1.98},
+  "Almuerzo Administrativo":    {neto: 1.8261, iva: 0.2739,  total: 2.10},
+  "Almuerzo Vianda":            {neto: 1.9391, iva: 0.2909,  total: 2.23},
+  "Merienda":                   {neto: 1.7217, iva: 0.2583,  total: 1.98},
+  "Merienda Vianda":            {neto: 1.7217, iva: 0.2583,  total: 1.98},
+  "Desayuno Administrativo":    {neto: 1.3652, iva: 0.2048,  total: 1.57},
+  "Desayuno Reforzado":         {neto: 1.3652, iva: 0.2048,  total: 1.57},
+  "Desayuno Reforzado Vianda":  {neto: 1.3652, iva: 0.2048,  total: 1.57},
+  "Desayunos":                  {neto: 0.6609, iva: 0.0991,  total: 0.76},
+  "Desayuno Vianda":            {neto: 0.6609, iva: 0.0991,  total: 0.76},
+  "Refrigerio R1":              {neto: 0.6609, iva: 0.0991,  total: 0.76},
+  "Refrigerio 1 Vianda":        {neto: 0.6609, iva: 0.0991,  total: 0.76},
+  "Refrigerio 2":               {neto: 0.3565, iva: 0.0535,  total: 0.41},
+  "Refrigerio 2 Vianda":        {neto: 0.3565, iva: 0.0535,  total: 0.41}
 };
-const PRECIO = 1.717; // Almuerzo Operativo (default)
+const PRECIO = 1.7217; // Almuerzo Operativo (default)
 const FINCAS = ["R1","R2","R3","R4","R5","R6"];
 const FC = {R1:"#E6F1FB",R2:"#EAF3DE",R3:"#FAEEDA",R4:"#F3E8FB",R5:"#FCEBEB",R6:"#E8F8EF"};
 const FT = {R1:"#185FA5",R2:"#3B6D11",R3:"#854F0B",R4:"#6B3FA0",R5:"#A32D2D",R6:"#1a7a4a"};
@@ -673,7 +673,7 @@ async function cargarDatosCloud(){
         if(/^\d+,\d+$/.test(puStr)) puStr = puStr.replace(',','.');
         var pu = parseFloat(puStr);
         if(!isNaN(pu) && pu > 100) pu = pu / 1000;
-        if(isNaN(pu)||pu===0) pu=1.717;
+        if(isNaN(pu)||pu===0) pu=1.7217;
         if(pu>100) pu=pu/1000;
         prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
       }
@@ -688,7 +688,7 @@ async function cargarDatosCloud(){
           if(/^\d+,\d+$/.test(puStr)) puStr = puStr.replace(',','.');
           var pu = parseFloat(puStr);
           if(!isNaN(pu) && pu > 100) pu = pu / 1000;
-          if(isNaN(pu)||pu===0) pu=1.717;
+          if(isNaN(pu)||pu===0) pu=1.7217;
           if(pu>100) pu=pu/1000;
           facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:parseNum(f.subtotal)||0,iva:parseNum(f.iva)||0,total:parseNum(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
         }
@@ -835,7 +835,7 @@ function limpiarConsumo(){
 function calcPF(){
   const q=parseInt(document.getElementById("p-qty").value)||0;
   const servNombre=document.getElementById("p-servicio")?.value||"Almuerzo Operativo";
-  const precio=PRECIOS_SERVICIOS[servNombre]||{neto:1.72,iva:0.258,total:1.98};
+  const precio=PRECIOS_SERVICIOS[servNombre]||{neto:1.7217,iva:0.2583,total:1.98};
   const sub=parseFloat((q*precio.neto).toFixed(4));
   const iv=parseFloat((sub*0.15).toFixed(6));
   const t=parseFloat((sub+iv).toFixed(6));
@@ -864,7 +864,7 @@ function irPS2(){
   const fecha=document.getElementById("p-fecha").value;
   const ref=document.getElementById("p-refpago").value;
   const servNombre=document.getElementById("p-servicio")?.value||"Almuerzo Operativo";
-  const precioObj=PRECIOS_SERVICIOS[servNombre]||{neto:1.72,iva:0.258,total:1.98};
+  const precioObj=PRECIOS_SERVICIOS[servNombre]||{neto:1.7217,iva:0.2583,total:1.98};
   const sub=parseFloat((qty*precioObj.neto).toFixed(4));
   const iva=parseFloat((sub*0.15).toFixed(6));
   const total=parseFloat((sub+iva).toFixed(6));
@@ -880,7 +880,7 @@ function irPS2(){
 function generarHTMLPF(pf, cl){
   return '<div class="pf-print-header"><div><img src="'+LOGO_B64+'" style="height:50px;margin-bottom:6px"><div class="hanaska-bar" style="width:120px"></div></div><div style="text-align:right"><div class="pf-num">PRE-FACTURA N° '+String(pf.id).padStart(5,"0")+'</div><div style="font-size:11px;color:#6b7694">Fecha: '+pf.fecha+'</div><div style="font-size:11px;color:#6b7694;margin-top:4px">Ref. pago: '+(pf.refPago||"—")+'</div></div></div>'
   +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">'
-  +'<div style="background:#f8f9fb;border-radius:8px;padding:12px"><div style="font-size:10px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:6px">Emisor</div><div style="font-weight:600;color:#0f1c3f">ROSAPRIMA CIA. LTDA.</div><div style="color:#6b7694;font-size:11px">Cayambe, Pichincha — Ecuador</div></div>'
+  +'<div style="background:#f8f9fb;border-radius:8px;padding:12px"><div style="font-size:10px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:6px">Emisor</div><div style="font-weight:600;color:#0f1c3f">TECFOOD SERVICIOS DE ALIMENTACION S.A.</div><div style="color:#6b7694;font-size:11px">RUC: 1792065461001</div><div style="color:#6b7694;font-size:11px">Cayambe, Pichincha — Ecuador</div></div>'
   +'<div style="background:#f8f9fb;border-radius:8px;padding:12px"><div style="font-size:10px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:6px">Contratista</div><div style="font-weight:600;color:#0f1c3f">'+pf.cliente+'</div><div style="color:#6b7694;font-size:11px">RUC: '+(cl.ruc||"—")+'</div><div style="color:#6b7694;font-size:11px">'+(cl.dir||"")+'</div></div></div>'
   +'<table style="margin-bottom:12px"><thead><tr><th style="text-align:left;padding:8px 12px;background:#0f1c3f;color:white;border-radius:6px 0 0 0">Descripción</th><th style="text-align:center;padding:8px 12px;background:#0f1c3f;color:white">Cant.</th><th style="text-align:right;padding:8px 12px;background:#0f1c3f;color:white">P. Unit.</th><th style="text-align:right;padding:8px 12px;background:#0f1c3f;color:white;border-radius:0 6px 0 0">Subtotal</th></tr></thead><tbody><tr><td style="padding:10px 12px;border-bottom:1px solid #f0f2f5">'+(pf.servicio||'Almuerzo Operativo')+'</td><td style="padding:10px 12px;text-align:center;font-weight:700;border-bottom:1px solid #f0f2f5">'+pf.qty+'</td><td style="padding:10px 12px;text-align:right;border-bottom:1px solid #f0f2f5">'+'$'+(parseFloat(pf.precioUnit||PRECIO).toFixed(4).replace('.',','))+'</td><td style="padding:10px 12px;text-align:right;font-weight:600;border-bottom:1px solid #f0f2f5">'+fmt(pf.sub)+'</td></tr></tbody></table>'
   +'<div style="display:flex;justify-content:flex-end"><div style="width:240px"><div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px"><span style="color:#6b7694">Subtotal</span><span>'+fmt(pf.sub)+'</span></div><div style="display:flex;justify-content:space-between;padding:5px 0;font-size:12px"><span style="color:#6b7694">IVA 15%</span><span>'+fmt(pf.iva)+'</span></div><div style="display:flex;justify-content:space-between;padding:8px 0;font-size:15px;font-weight:700;border-top:2px solid #0f1c3f;margin-top:4px"><span>TOTAL</span><span style="color:#185FA5">'+fmt(pf.total)+'</span></div></div></div>'
@@ -911,7 +911,7 @@ function imprimirPF(){
   consFact.forEach(x=>{ porFinca[x.finca]=(porFinca[x.finca]||0)+x.qty; });
   if(!consFact.length) porFinca['R1']=curPF.qty;
 
-  const precioU = parseFloat(curPF.precioUnit)||1.717;
+  const precioU = parseFloat(curPF.precioUnit)||1.7217;
   const sub = parseFloat(curPF.sub)||parseFloat((curPF.qty*precioU).toFixed(4));
   const iva = parseFloat(curPF.iva)||parseFloat((sub*0.15).toFixed(4));
   const tot = parseFloat(curPF.total)||parseFloat((sub+iva).toFixed(4));
@@ -1036,17 +1036,17 @@ function agregarFacturaPendiente(pf){
 
 /* ── PEDIDO DE FACTURACIÓN ─────────────────────────────── */
 const PRECIOS_PF = {
-  "Almuerzo Operativo":        {neto:1.717,  iva:0.258,  total:1.98},
-  "Almuerzo Administrativo":   {neto:1.818,  iva:0.273,  total:2.10},
-  "Desayuno Administrativo":   {neto:1.3636, iva:0.205,  total:1.57},
-  "Desayuno Reforzado":        {neto:1.3636, iva:0.205,  total:1.57},
-  "Refrigerio R1":             {neto:0.6566, iva:0.098,  total:0.76},
-  "Refrigerio 2":              {neto:0.3536, iva:0.053,  total:0.41},
-  "Desayuno Vianda":           {neto:0.6566, iva:0.098,  total:0.76},
-  "Desayuno Reforzado Vianda": {neto:1.3636, iva:0.205,  total:1.57},
-  "Merienda Vianda":           {neto:1.717,  iva:0.258,  total:1.98},
-  "Refrigerio 1 Vianda":       {neto:0.6566, iva:0.098,  total:0.76},
-  "Refrigerio 2 Vianda":       {neto:0.3536, iva:0.053,  total:0.41}
+  "Almuerzo Operativo":        {neto:1.7217, iva:0.2583,  total:1.98},
+  "Almuerzo Administrativo":   {neto:1.8261, iva:0.2739,  total:2.10},
+  "Desayuno Administrativo":   {neto:1.3652, iva:0.2048,  total:1.57},
+  "Desayuno Reforzado":        {neto:1.3652, iva:0.2048,  total:1.57},
+  "Refrigerio R1":             {neto:0.6609, iva:0.0991,  total:0.76},
+  "Refrigerio 2":              {neto:0.3565, iva:0.0535,  total:0.41},
+  "Desayuno Vianda":           {neto:0.6609, iva:0.0991,  total:0.76},
+  "Desayuno Reforzado Vianda": {neto:1.3652, iva:0.2048,  total:1.57},
+  "Merienda Vianda":           {neto:1.7217, iva:0.2583,  total:1.98},
+  "Refrigerio 1 Vianda":       {neto:0.6609, iva:0.0991,  total:0.76},
+  "Refrigerio 2 Vianda":       {neto:0.3565, iva:0.0535,  total:0.41}
 };
 
 function getPrecioPF(servicio, precioUnitRaw){
