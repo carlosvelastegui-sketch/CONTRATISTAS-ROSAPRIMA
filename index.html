@@ -681,7 +681,7 @@ async function cargarDatosCloud(){
     // Cargar TODAS las facturas sin duplicar
     if(Array.isArray(facts)) facts.forEach(f=>{
       const fid = parseInt(f.id)||0;
-      const estado = (f.estado && f.estado.trim()) ? f.estado.trim() : 'pendiente_pago';
+      const estado = (f.estado && f.estado.trim()) ? f.estado.trim() : (f.factura && f.factura.trim() ? 'pagado' : 'pendiente_pago');
       // Deduplicar por id de factura (no por npref, ya que pueden existir varias prefacturas del mismo contratista)
       if(!facturas.find(x=>parseInt(x.id)===fid)){
         var puStr = String(f.precioUnit||'').trim();
