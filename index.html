@@ -675,7 +675,7 @@ async function cargarDatosCloud(){
         if(!isNaN(pu) && pu > 100) pu = pu / 1000;
         if(isNaN(pu)||pu===0) pu=1.7217;
         if(pu>100) pu=pu/1000;
-        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:p.estado||'pendiente',fecha:p.fecha||''});
+        const estadoPF=(p.estado==='pendiente'||!p.estado)?'pendiente_pago':p.estado; prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:estadoPF,fecha:p.fecha||''});
       }
     });
     // Cargar TODAS las facturas sin duplicar
@@ -988,7 +988,8 @@ function imprimirPF(){
 function renderControl(){
   const f = document.getElementById("filtro-ctrl")?.value||"";
   let data = [...facturas];
-  if(f) data = data.filter(x=>x.estado===f);
+  if(f === 'pendiente_pago') data = data.filter(x=>x.estado==='pendiente_pago' || x.estado==='pendiente');
+  else if(f) data = data.filter(x=>x.estado===f);
   data = data.reverse();
   document.getElementById("ctrl-table").innerHTML = data.map(function(x){
     const isPaid = x.estado === 'pagado';
