@@ -1043,6 +1043,7 @@ function abrirModalPago(id){
 
 function guardarPago(){
   const factura=document.getElementById("mpago-factura").value.trim();
+  if(!factura){ alert("⚠ Debe ingresar el N° de Factura emitida para registrar el pago."); return; }
   const x=facturas.find(f=>f.id===pagoId); if(!x) return;
   x.valorPagado=parseFloat(document.getElementById("mpago-valor").value)||0;
   x.retencion=parseFloat(document.getElementById("mpago-retencion").value)||0;
