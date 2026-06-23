@@ -680,18 +680,17 @@ async function cargarDatosCloud(){
     });
     // Cargar TODAS las facturas sin duplicar
     if(Array.isArray(facts)) facts.forEach(f=>{
-      const npref = parseInt(f.npref||0);
-      const estado = f.estado||'pendiente_pago';
-      if(!facturas.find(x=>parseInt(x.npref)===npref)){
-        if(true){
-          var puStr = String(f.precioUnit||'').trim();
-          if(/^\d+,\d+$/.test(puStr)) puStr = puStr.replace(',','.');
-          var pu = parseFloat(puStr);
-          if(!isNaN(pu) && pu > 100) pu = pu / 1000;
-          if(isNaN(pu)||pu===0) pu=1.7217;
-          if(pu>100) pu=pu/1000;
-          facturas.push({id:parseInt(f.id)||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:parseNum(f.subtotal)||0,iva:parseNum(f.iva)||0,total:parseNum(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
-        }
+      const fid = parseInt(f.id)||0;
+      const estado = (f.estado && f.estado.trim()) ? f.estado.trim() : 'pendiente_pago';
+      // Deduplicar por id de factura (no por npref, ya que pueden existir varias prefacturas del mismo contratista)
+      if(!facturas.find(x=>parseInt(x.id)===fid)){
+        var puStr = String(f.precioUnit||'').trim();
+        if(/^\d+,\d+$/.test(puStr)) puStr = puStr.replace(',','.');
+        var pu = parseFloat(puStr);
+        if(!isNaN(pu) && pu > 100) pu = pu / 1000;
+        if(isNaN(pu)||pu===0) pu=1.7217;
+        if(pu>100) pu=pu/1000;
+        facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:parseNum(f.subtotal)||0,iva:parseNum(f.iva)||0,total:parseNum(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
       }
     });
     renderDash();
