@@ -899,7 +899,7 @@ function irPS2(){
 // la fecha de la prefactura/factura actual (inclusiva). Si no hay consumos
 // reales en ese rango, NO se asigna ninguna finca por defecto (antes se
 // forzaba todo a "R1", lo cual era incorrecto).
-function getFincaBreakdown(cliente, fechaHasta){
+function getFincaBreakdown(cliente, fechaHasta, qtyTotal){
   const todosC = consumosHistoricos.concat(consumos);
   const anteriores = facturas
     .filter(x=>x.cliente===cliente && x.fecha && x.fecha < fechaHasta)
@@ -909,6 +909,25 @@ function getFincaBreakdown(cliente, fechaHasta){
   const consFact = todosC.filter(x=>x.cliente===cliente && x.fecha>fechaDesde && x.fecha<=fechaHasta);
   const porFinca = {};
   consFact.forEach(x=>{ const f=x.finca||'R1'; porFinca[f]=(porFinca[f]||0)+x.qty; });
+  // Si el total de consumos del período supera el qty de la prefactura,
+  // distribuir proporcionalmente para que sumen exactamente qtyTotal
+  if(qtyTotal && qtyTotal > 0){
+    const totalCons = Object.values(porFinca).reduce((a,b)=>a+b,0);
+    if(totalCons > 0 && Math.abs(totalCons - qtyTotal) > 1){
+      const factor = qtyTotal / totalCons;
+      let sumAjuste = 0;
+      const fincas = Object.keys(porFinca);
+      fincas.forEach((f,i)=>{
+        if(i < fincas.length - 1){
+          porFinca[f] = Math.round(porFinca[f] * factor);
+          sumAjuste += porFinca[f];
+        } else {
+          // La última finca absorbe la diferencia para que sumen exacto
+          porFinca[f] = qtyTotal - sumAjuste;
+        }
+      });
+    }
+  }
   return porFinca;
 }
 
@@ -1067,8 +1086,8 @@ function guardarPago(){
 
 // Called when a new prefactura is confirmed - adds to facturas list as pending payment
 function agregarFacturaPendiente(pf){
-  // Evitar duplicados: no agregar si ya existe una factura con el mismo npref
-  if(facturas.find(f=>String(f.npref)===String(pf.id))) return;
+  // Evitar duplicados: no agregar si ya existe una factura con el mismo npref Y qty
+  if(facturas.find(f=>String(f.npref)===String(pf.id) && parseInt(f.qty)===parseInt(pf.qty))) return;
   facturas.push({
     id: nextFactId++,
     cliente: pf.cliente, qty: pf.qty,
@@ -1112,7 +1131,7 @@ function getPrecioPF(servicio, precioUnitRaw){
 
 function calcFilaPF(f){
   const cli  = clientes.find(c=>c.nombre===f.cliente)||{};
-  const porFinca = getFincaBreakdown(f.cliente, f.fecha);
+  const porFinca = getFincaBreakdown(f.cliente, f.fecha, f.qty);
   const precioU = getPrecioPF(f.servicio, f.precioUnit);
   const sub = parseFloat((f.qty * precioU).toFixed(4));
   const iva = parseFloat((sub * 0.15).toFixed(4));
