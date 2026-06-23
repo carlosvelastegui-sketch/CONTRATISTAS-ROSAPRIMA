@@ -691,7 +691,18 @@ async function cargarDatosCloud(){
         if(!isNaN(pu) && pu > 100) pu = pu / 1000;
         if(isNaN(pu)||pu===0) pu=1.7217;
         if(pu>100) pu=pu/1000;
-        facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:parseInt(f.qty)||0,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:parseNum(f.subtotal)||0,iva:parseNum(f.iva)||0,total:parseNum(f.total)||0,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
+        const fQty = parseInt(f.qty)||0;
+        let fSub = parseNum(f.subtotal)||0;
+        let fIva = parseNum(f.iva)||0;
+        let fTotal = parseNum(f.total)||0;
+        // Si el total es absurdamente grande (>1000 veces qty*precio), recalcular
+        const fTotalEsperado = parseFloat((fQty * pu * 1.15).toFixed(2));
+        if(fTotalEsperado > 0 && fTotal > fTotalEsperado * 100){
+          fSub = parseFloat((fQty * pu).toFixed(2));
+          fIva = parseFloat((fSub * 0.15).toFixed(2));
+          fTotal = parseFloat((fSub + fIva).toFixed(2));
+        }
+        facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:fQty,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:fSub,iva:fIva,total:fTotal,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
       }
     });
     renderDash();
