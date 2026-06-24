@@ -685,10 +685,10 @@ async function cargarDatosCloud(){
     if(Array.isArray(facts)) facts.forEach(f=>{
       const fid = parseInt(f.id)||0;
       // Limpiar factura: si contiene 'pendiente', 'pagado' o similar, no es factura real
-      var facturaLimpia = (f.factura||'').trim();
+      var facturaLimpia = String(f.factura||'').trim();
       if(facturaLimpia.toLowerCase().includes('pendiente') || facturaLimpia.toLowerCase().includes('pagado')) facturaLimpia = '';
       // Limpiar comprobante para validación
-      var comprobantePago = (f.comprobante||'').trim();
+      var comprobantePago = String(f.comprobante||'').trim();
       if(comprobantePago.toLowerCase().includes('pendiente') || comprobantePago.toLowerCase().includes('pagado')) comprobantePago = '';
       const valorPagadoReal = parseFloat(f.valorPagado)||0;
       // Históricas (npref < 52): pagadas tal como están
@@ -720,7 +720,7 @@ async function cargarDatosCloud(){
         // Limpiar fecha: eliminar parte de hora si viene como ISO (2026-06-18T05:00:00.000Z)
         var fechaLimpia = (f.fecha||'').toString().slice(0,10);
         // Limpiar comprobante: si contiene 'pendiente' o 'pagado' no es un comprobante real
-        var comprobanteLimpio = (f.comprobante||'');
+        var comprobanteLimpio = String(f.comprobante||'');
         if(comprobanteLimpio.toLowerCase().includes('pendiente') || comprobanteLimpio.toLowerCase().includes('pagado')) comprobanteLimpio = '';
         facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:fQty,fecha:fechaLimpia,servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:fSub,iva:fIva,total:fTotal,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:facturaLimpia,comprobante:comprobanteLimpio,estado:estado,fechaPago:f.fechaPago||''});
       }
