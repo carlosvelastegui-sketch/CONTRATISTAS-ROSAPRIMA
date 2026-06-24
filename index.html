@@ -314,6 +314,9 @@ tbody tr:hover td{background:#f8f9fb}
               <button class="btn btn-primary btn-sm" onclick="showPedidoFact()" style="font-size:12px">
                 <i class="ti ti-file-invoice"></i> Pedido de Facturación
               </button>
+              <select id="filtro-ctrl-cli" onchange="renderControl()" style="width:auto;padding:6px 10px;font-size:12px">
+                <option value="">Todos los contratistas</option>
+              </select>
               <select id="filtro-ctrl" onchange="renderControl()" style="width:auto;padding:6px 10px;font-size:12px">
                 <option value="">Todas</option>
                 <option value="pagado">Pagadas</option>
@@ -1017,9 +1020,20 @@ function imprimirPF(){
 /* CONTROL */
 function renderControl(){
   const f = document.getElementById("filtro-ctrl")?.value||"";
+  const fCli = document.getElementById("filtro-ctrl-cli")?.value||"";
+  // Poblar select de contratistas si está vacío
+  const selCli = document.getElementById("filtro-ctrl-cli");
+  if(selCli && selCli.options.length === 1){
+    clientes.forEach(function(c){
+      const o = document.createElement("option");
+      o.value = c.nombre; o.textContent = c.nombre;
+      selCli.appendChild(o);
+    });
+  }
   let data = [...facturas];
   if(f === 'pendiente_pago') data = data.filter(x=>x.estado==='pendiente_pago' || x.estado==='pendiente');
   else if(f) data = data.filter(x=>x.estado===f);
+  if(fCli) data = data.filter(x=>x.cliente===fCli);
   data = data.reverse();
   document.getElementById("ctrl-table").innerHTML = data.map(function(x){
     const isPaid = x.estado === 'pagado';
