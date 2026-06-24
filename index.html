@@ -705,7 +705,12 @@ async function cargarDatosCloud(){
           fIva = parseFloat((fSub * 0.15).toFixed(2));
           fTotal = parseFloat((fSub + fIva).toFixed(2));
         }
-        facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:fQty,fecha:f.fecha||'',servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:fSub,iva:fIva,total:fTotal,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:f.comprobante||'',estado:estado,fechaPago:f.fechaPago||''});
+        // Limpiar fecha: eliminar parte de hora si viene como ISO (2026-06-18T05:00:00.000Z)
+        var fechaLimpia = (f.fecha||'').toString().slice(0,10);
+        // Limpiar comprobante: si contiene 'pendiente' o 'pagado' no es un comprobante real
+        var comprobanteLimpio = (f.comprobante||'');
+        if(comprobanteLimpio.toLowerCase().includes('pendiente') || comprobanteLimpio.toLowerCase().includes('pagado')) comprobanteLimpio = '';
+        facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:fQty,fecha:fechaLimpia,servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:fSub,iva:fIva,total:fTotal,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:f.factura||'',comprobante:comprobanteLimpio,estado:estado,fechaPago:f.fechaPago||''});
       }
     });
     renderDash();
