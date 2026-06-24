@@ -1038,14 +1038,17 @@ function imprimirPF(){
 function renderControl(){
   const f = document.getElementById("filtro-ctrl")?.value||"";
   const fCli = document.getElementById("filtro-ctrl-cli")?.value||"";
-  // Poblar select de contratistas si está vacío
+  // Poblar select de contratistas (siempre refrescar para tener datos actualizados)
   const selCli = document.getElementById("filtro-ctrl-cli");
-  if(selCli && selCli.options.length === 1){
+  if(selCli){
+    const valActual = selCli.value;
+    selCli.innerHTML = '<option value="">Todos los contratistas</option>';
     clientes.forEach(function(c){
       const o = document.createElement("option");
       o.value = c.nombre; o.textContent = c.nombre;
       selCli.appendChild(o);
     });
+    selCli.value = valActual;
   }
   let data = [...facturas];
   if(f === 'pendiente_pago') data = data.filter(x=>x.estado==='pendiente_pago' || x.estado==='pendiente');
