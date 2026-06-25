@@ -1221,14 +1221,35 @@ function reimprimirPF(facturaId){
     pf.iva = parseFloat((pf.sub * 0.15).toFixed(4));
     pf.total = parseFloat((pf.sub + pf.iva).toFixed(4));
   }
-  // Mostrar en print-area e imprimir
-  const area = document.getElementById('print-area');
-  area.innerHTML = generarHTMLPF(pf, cl);
-  area.style.display = 'block';
+  // Abrir ventana nueva solo con el contenido de la prefactura
+  const html = generarHTMLPF(pf, cl);
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <title>Prefactura PF-${String(pf.id).padStart(5,'0')}</title>
+    <style>
+      @page { size: A4 landscape; margin: 10mm; }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Inter', sans-serif; font-size: 12px; line-height: 1.6; background: white; padding: 10mm; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+      th { padding: 8px 12px; background: #0f1c3f; color: white; text-align: left; }
+      td { padding: 10px 12px; border-bottom: 1px solid #f0f2f5; }
+      .pf-num { font-family: sans-serif; font-size: 20px; font-weight: 700; color: #185FA5; }
+      .pf-print-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid #0f1c3f; }
+      .pf-print-footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e6ed; font-size: 11px; color: #6b7694; text-align: center; }
+      .hanaska-bar { height: 4px; background: linear-gradient(90deg,#e63946 0%,#f4a261 25%,#2a9d8f 50%,#185FA5 75%,#0f1c3f 100%); margin-top: 8px; border-radius: 2px; }
+    </style>
+  </head><body>${html}</body></html>`);
+  win.document.close();
+  win.focus();
+  // Esperar a que imágenes y estilos carguen antes de imprimir
+  win.onload = function(){
+    setTimeout(function(){ win.print(); }, 300);
+  };
+  // Fallback por si onload no dispara
   setTimeout(function(){
-    window.print();
-    area.style.display = 'none';
-  }, 300);
+    if(!win.closed){ win.print(); }
+  }, 1500);
 }
 
 function agregarFacturaPendiente(pf){
