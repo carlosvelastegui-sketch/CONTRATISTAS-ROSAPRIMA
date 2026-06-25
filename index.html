@@ -119,7 +119,10 @@ tbody tr:hover td{background:#f8f9fb}
 .rpt-kpi-lbl{font-size:11px;color:#6b7694;font-weight:600;text-transform:uppercase;margin-top:4px}
 /* PDF print */
 @media print{
+  @page { size: A4 landscape; margin: 10mm; }
+  html, body { width: 100%; height: 100%; }
   .sidebar,.topbar,.actions,.btn,.step-bar,.no-print{display:none!important}
+  #print-area { transform-origin: top left; width: 100% !important; }
   .main{overflow:visible!important}
   .content{overflow:visible!important;padding:0!important;background:white!important}
   .tab-content{display:none!important}
@@ -1075,7 +1078,7 @@ function renderControl(){
     const isPaid = x.estado === 'pagado';
     return '<tr>'
       +'<td style="font-weight:700;color:#185FA5;font-size:12px">'+x.factura+'</td>'
-      +'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span> <button class="btn btn-pdf btn-sm" style="padding:2px 8px;font-size:11px" onclick="reimprimirPF('+x.id+')"><i class="ti ti-file-type-pdf"></i> PDF</button></td>'
+      +'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span>'+(parseInt(x.npref||0)>=52?' <button class="btn btn-pdf btn-sm" style="padding:2px 8px;font-size:11px" onclick="reimprimirPF('+x.id+')"><i class="ti ti-file-type-pdf"></i> PDF</button>':'')+' </td>'
       +'<td style="font-size:11px;color:#6b7694">'+( x.fecha||"—")+'</td>'
       +'<td style="font-size:12px">'+sh(x.cliente,18)+'</td>'
       +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
