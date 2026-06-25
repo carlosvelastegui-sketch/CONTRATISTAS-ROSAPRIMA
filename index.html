@@ -327,6 +327,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div style="overflow-x:auto">
             <table><thead><tr>
               <th>N° Factura</th>
+              <th>N° Prefactura</th>
               <th>Fecha</th>
               <th>Contratista</th>
               <th>Servicio</th>
@@ -1074,6 +1075,7 @@ function renderControl(){
     const isPaid = x.estado === 'pagado';
     return '<tr>'
       +'<td style="font-weight:700;color:#185FA5;font-size:12px">'+x.factura+'</td>'
+      +'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span> <button class="btn btn-pdf btn-sm" style="padding:2px 8px;font-size:11px" onclick="reimprimirPF('+x.id+')"><i class="ti ti-file-type-pdf"></i> PDF</button></td>'
       +'<td style="font-size:11px;color:#6b7694">'+( x.fecha||"—")+'</td>'
       +'<td style="font-size:12px">'+sh(x.cliente,18)+'</td>'
       +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
@@ -1086,7 +1088,7 @@ function renderControl(){
       +'<td>'+(isPaid
         ?'<span class="badge badge-ok">Pagado</span>'
         :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
-      +'<td style="display:flex;gap:6px">'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':"")+'<button class="btn btn-pdf btn-sm" onclick="reimprimirPF('+x.id+')"><i class="ti ti-file-type-pdf"></i> PDF</button></td>'
+      +'<td>'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':'')+'</td>'
       +'</tr>';
   }).join("");
 }
