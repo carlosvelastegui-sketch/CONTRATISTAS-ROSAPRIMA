@@ -967,25 +967,7 @@ function getFincaBreakdown(cliente, fechaHasta, qtyTotal){
   const consFact = todosC.filter(x=>x.cliente===cliente && limpiarFecha(x.fecha)>fechaDesde && limpiarFecha(x.fecha)<=limpiarFecha(fechaHasta));
   const porFinca = {};
   consFact.forEach(x=>{ const f=x.finca||'R1'; porFinca[f]=(porFinca[f]||0)+x.qty; });
-  // Si el total de consumos del período supera el qty de la prefactura,
-  // distribuir proporcionalmente para que sumen exactamente qtyTotal
-  if(qtyTotal && qtyTotal > 0){
-    const totalCons = Object.values(porFinca).reduce((a,b)=>a+b,0);
-    if(totalCons > 0 && Math.abs(totalCons - qtyTotal) > 1){
-      const factor = qtyTotal / totalCons;
-      let sumAjuste = 0;
-      const fincas = Object.keys(porFinca);
-      fincas.forEach((f,i)=>{
-        if(i < fincas.length - 1){
-          porFinca[f] = Math.round(porFinca[f] * factor);
-          sumAjuste += porFinca[f];
-        } else {
-          // La última finca absorbe la diferencia para que sumen exacto
-          porFinca[f] = qtyTotal - sumAjuste;
-        }
-      });
-    }
-  }
+  // Mostrar consumos reales por finca sin ajustar al total de la prefactura
   return porFinca;
 }
 
@@ -1260,10 +1242,12 @@ function calcFilaPF(f){
   const cli  = clientes.find(c=>c.nombre===f.cliente)||{};
   const porFinca = getFincaBreakdown(f.cliente, f.fecha, f.qty);
   const precioU = getPrecioPF(f.servicio, f.precioUnit);
-  const sub = parseFloat((f.qty * precioU).toFixed(4));
+  // Usar total real de consumos registrados, no el valor de la prefactura
+  const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0) || f.qty;
+  const sub = parseFloat((totalReal * precioU).toFixed(4));
   const iva = parseFloat((sub * 0.15).toFixed(4));
   const tot = parseFloat((sub + iva).toFixed(4));
-  return {f, cli, porFinca, precioU, sub, iva, tot};
+  return {f, cli, porFinca, precioU, sub, iva, tot, totalReal};
 }
 
 function showPedidoFact(){
@@ -1297,6 +1281,24 @@ function getSeleccionadas(){
 
 function generarPedido(){
   const selected = getSeleccionadas(); if(!selected) return;
+
+  // Validar que consumos reales cuadren con lo prepagado
+  const errores = [];
+  selected.forEach(function(f){
+    const porFinca = getFincaBreakdown(f.cliente, f.fecha, f.qty);
+    const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0);
+    if(totalReal < f.qty){
+      errores.push('⚠ '+f.cliente+' (PF-'+String(f.npref||f.id).padStart(5,'0')+'): prepagados '+f.qty+' alm. · consumos registrados '+totalReal+' alm. · faltan '+(f.qty-totalReal)+' alm.');
+    } else if(totalReal > f.qty){
+      errores.push('🚫 '+f.cliente+' (PF-'+String(f.npref||f.id).padStart(5,'0')+'): prepagados '+f.qty+' alm. · consumos registrados '+totalReal+' alm. · excede en '+(totalReal-f.qty)+' alm.');
+    }
+  });
+
+  if(errores.length){
+    const msg = 'Los consumos no cuadran con lo prepagado:\n\n'+errores.join('\n')+'\n\n¿Deseas continuar de todas formas?';
+    if(!confirm(msg)) return;
+  }
+
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
@@ -1340,7 +1342,7 @@ function generarPedido(){
           <td style="padding:8px 10px;color:#6b7694">${r.cli.dir||'—'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.cli.tel||'—'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.cli.correo||'—'}</td>
-          <td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">${r.totalReal}</td>
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R1']||''}</td>
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R2']||''}</td>
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R3']||''}</td>
@@ -1371,6 +1373,8 @@ function generarPedido(){
 
 function descargarPedidoExcel(){
   const selected = getSeleccionadas(); if(!selected) return;
+  // Misma validación de consumos
+  const err2=[];selected.forEach(function(f){const pf2=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
@@ -1400,6 +1404,7 @@ function descargarPedidoExcel(){
 
 function descargarPedidoPDF(){
   const selected = getSeleccionadas(); if(!selected) return;
+  const err3=[];selected.forEach(function(f){const pf3=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr3=Object.values(pf3).reduce((a,b)=>a+b,0);if(tr3!==f.qty)err3.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr3);});if(err3.length&&!confirm('Consumos no cuadran:\n'+err3.join('\n')+'\n\n¿Continuar?')) return;
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
