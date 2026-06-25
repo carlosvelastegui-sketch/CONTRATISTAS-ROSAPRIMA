@@ -259,7 +259,12 @@ tbody tr:hover td{background:#f8f9fb}
             <div class="form-row">
               <div class="form-group"><label>Cantidad</label>
                 <input type="number" id="p-qty" min="1" value="50" oninput="calcPF()"></div>
-              <div class="resumen-box">
+              <div class="form-group"><label>Precio unitario (neto)</label>
+                <input type="text" id="p-precio-display" readonly></div>
+            </div>
+            <div class="form-group" style="margin-bottom:12px"><label>Referencia de pago / transferencia</label>
+              <input type="text" id="p-refpago" placeholder="Ej: TRF-2026-001"></div>
+            <div class="resumen-box">
               <div class="r-titulo">Resumen</div>
               <div class="r-linea"><span>Cantidad</span><span id="pc-qty">50</span></div>
               <div class="r-linea"><span>Precio unitario (neto)</span><span id="pc-unit">$1.7217</span></div>
@@ -328,6 +333,7 @@ tbody tr:hover td{background:#f8f9fb}
               <th>Servicio</th>
               <th class="num">Alm.</th>
               <th class="num">Total</th>
+              <th>Ref. Pago</th>
               <th class="num">Valor Pagado</th>
               <th class="num">Retención</th>
               <th>N° Comprobante</th>
@@ -413,8 +419,6 @@ tbody tr:hover td{background:#f8f9fb}
           <tbody id="rpt-resumen"></tbody></table>
         </div>
       </div>
-
-      </div><!-- /tab-reportes -->
 
       <!-- CONTRATISTAS -->
       <div class="tab-content" id="tab-clientes">
@@ -675,16 +679,12 @@ async function cargarDatosCloud(){
         if(!isNaN(pu) && pu > 100) pu = pu / 1000;
         if(isNaN(pu)||pu===0) pu=1.7217;
         if(pu>100) pu=pu/1000;
-        const estadoPF=(p.estado==='pendiente'||!p.estado)?'pendiente_pago':p.estado;
-        const pfFecha = (p.fecha||'').toString().slice(0,10);
-        prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:estadoPF,fecha:pfFecha});
+        const estadoPF=(p.estado==='pendiente'||!p.estado)?'pendiente_pago':p.estado; prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:estadoPF,fecha:p.fecha||''});
       }
     });
     // Cargar TODAS las facturas sin duplicar
     if(Array.isArray(facts)) facts.forEach(f=>{
-      // Sanear fid: si viene vacío, es 0, o es un número raro (>9999), usar nextFactId
-      const rawFid = parseInt(f.id)||0;
-      const fid = (rawFid > 0 && rawFid <= 9999) ? rawFid : 0;
+      const fid = parseInt(f.id)||0;
       // Limpiar factura: si contiene 'pendiente', 'pagado' o similar, no es factura real
       var facturaLimpia = String(f.factura||'').trim();
       if(facturaLimpia.toLowerCase().includes('pendiente') || facturaLimpia.toLowerCase().includes('pagado')) facturaLimpia = '';
@@ -726,17 +726,9 @@ async function cargarDatosCloud(){
         facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:fQty,fecha:fechaLimpia,servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:fSub,iva:fIva,total:fTotal,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:facturaLimpia,comprobante:comprobanteLimpio,estado:estado,fechaPago:f.fechaPago||''});
       }
     });
-    // Recalcular nextPFid y nextFactId desde IDs reales para evitar duplicados
-    if(prefacturas.length > 0){
-      const maxPFid = Math.max(...prefacturas.map(p=>parseInt(p.id)||0));
-      if(maxPFid >= nextPFid) nextPFid = maxPFid + 1;
-    }
-    if(facturas.length > 0){
-      const maxFid = Math.max(...facturas.map(f=>parseInt(f.id)||0));
-      if(maxFid >= nextFactId) nextFactId = maxFid + 1;
-    }
-    const nprefEl = document.getElementById('p-npref');
-    if(nprefEl) nprefEl.value = nextPFid;
+    if(prefacturas.length>0){const maxPFid=Math.max(...prefacturas.map(p=>parseInt(p.id)||0));if(maxPFid>=nextPFid)nextPFid=maxPFid+1;}
+    if(facturas.length>0){const maxFid=Math.max(...facturas.map(f=>parseInt(f.id)||0));if(maxFid>=nextFactId)nextFactId=maxFid+1;}
+    const nprefEl=document.getElementById('p-npref');if(nprefEl)nprefEl.value=nextPFid;
     renderDash();
     renderControl();
     console.log('✓ Datos cargados. Próximo PF#:', nextPFid, '| Próxima Factura ID:', nextFactId);
@@ -922,13 +914,14 @@ function irPS2(){
   const qty=parseInt(document.getElementById("p-qty").value)||0;
   if(!qty){alert("Ingresa la cantidad");return;}
   const fecha=document.getElementById("p-fecha").value;
+  const ref=document.getElementById("p-refpago").value;
   const servNombre=document.getElementById("p-servicio")?.value||"Almuerzo Operativo";
   const precioObj=PRECIOS_SERVICIOS[servNombre]||{neto:1.7217,iva:0.2583,total:1.98};
   const sub=parseFloat((qty*precioObj.neto).toFixed(4));
   const iva=parseFloat((sub*0.15).toFixed(6));
   const total=parseFloat((sub+iva).toFixed(6));
   const cl=clientes.find(c=>c.nombre===cli)||{ruc:"-",tel:"-",dir:"-"};
-  curPF={id:nextPFid,cliente:cli,qty,servicio:servNombre,precioUnit:precioObj.neto,sub,iva,total,refPago:'',factura:"",fecha,estado:"pendiente"};
+  curPF={id:nextPFid,cliente:cli,qty,servicio:servNombre,precioUnit:precioObj.neto,sub,iva,total,refPago:ref,factura:"",fecha,estado:"pendiente"};
   document.getElementById("pf-preview").innerHTML=generarHTMLPF(curPF, cl);
   ["ppaso1","ppaso2","ppaso3"].forEach((p,i)=>document.getElementById(p).style.display=i===1?"":"none");
   document.getElementById("ps1").className="step done";
@@ -1066,7 +1059,6 @@ function renderControl(){
   else if(f) data = data.filter(x=>x.estado===f);
   if(fCli) data = data.filter(x=>x.cliente===fCli);
   data = data.reverse();
-  try{
   document.getElementById("ctrl-table").innerHTML = data.map(function(x){
     const isPaid = x.estado === 'pagado';
     return '<tr>'
@@ -1077,16 +1069,16 @@ function renderControl(){
       +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
       +'<td class="num">'+x.qty+'</td>'
       +'<td class="num">'+fmt(x.total)+'</td>'
+      +'<td style="font-size:11px;color:#6b7694">'+(x.refPago||"—")+'</td>'
       +'<td class="num">'+(isPaid?fmt(x.valorPagado):"—")+'</td>'
       +'<td class="num">'+(x.retencion?fmt(x.retencion):"—")+'</td>'
       +'<td style="font-size:11px;color:#6b7694">'+(x.comprobante||"—")+'</td>'
       +'<td>'+(isPaid
         ?'<span class="badge badge-ok">Pagado</span>'
         :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
-      +'<td>'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':'')+'</td>'
+      +'<td>'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':"")+'</td>'
       +'</tr>';
   }).join("");
-  }catch(e){ console.error('renderControl ERROR:',e); }
 }
 
 let pagoId=null;
@@ -1100,11 +1092,8 @@ function abrirModalPago(id){
     +'<div><div style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Fecha</div><div>'+(x.fecha||"—")+'</div></div>'
     +'<div><div style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Total</div><div style="font-weight:700;color:#185FA5">'+fmt(x.total)+'</div></div>'
     +'</div>';
-  // Determinar si ya tiene pago y comprobante registrados
-  // yaPagado: tiene valor pagado Y (comprobante O refPago)
   const yaPagado = x.valorPagado > 0 && x.comprobante;
   const camposModal = ["mpago-factura","mpago-fecha","mpago-comprobante","mpago-valor","mpago-retencion","mpago-obs"];
-
   document.getElementById("mpago-factura").value=x.factura;
   document.getElementById("mpago-fecha").value=x.fechaPago||new Date().toISOString().split("T")[0];
   document.getElementById("mpago-comprobante").value=x.comprobante||"";
@@ -1112,39 +1101,29 @@ function abrirModalPago(id){
   document.getElementById("mpago-retencion").value=x.retencion||"0";
   document.getElementById("mpago-dif").value="0.00";
   document.getElementById("mpago-obs").value=x.obs||"";
-
-  // Bloquear todos los campos si ya tiene pago y comprobante
   camposModal.forEach(function(id){
-    const el = document.getElementById(id);
-    if(el){ el.readOnly = yaPagado; el.style.background = yaPagado?"#f0f4fa":""; el.style.color = yaPagado?"#6b7694":""; }
+    const el=document.getElementById(id);
+    if(el){el.readOnly=yaPagado;el.style.background=yaPagado?"#f0f4fa":"";el.style.color=yaPagado?"#6b7694":"";}
   });
-
-  // Mostrar aviso si ya está registrado el pago
-  let avisoEl = document.getElementById("mpago-aviso-pagado");
+  let avisoEl=document.getElementById("mpago-aviso-pagado");
   if(!avisoEl){
-    avisoEl = document.createElement("div");
-    avisoEl.id = "mpago-aviso-pagado";
-    avisoEl.style.cssText = "background:#e8f5e9;border:1px solid #4caf50;color:#1b5e20;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:12px;display:none";
-    avisoEl.innerHTML = "✅ Pago y comprobante ya registrados. Solo puedes ingresar el N° de Factura para cerrar.";
-    document.getElementById("mpago-resumen").insertAdjacentElement("afterend", avisoEl);
+    avisoEl=document.createElement("div");
+    avisoEl.id="mpago-aviso-pagado";
+    avisoEl.style.cssText="background:#e8f5e9;border:1px solid #4caf50;color:#1b5e20;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:12px;display:none";
+    avisoEl.innerHTML="Pago y comprobante ya registrados. Solo puedes ingresar el N° de Factura para cerrar.";
+    document.getElementById("mpago-resumen").insertAdjacentElement("afterend",avisoEl);
   }
-  avisoEl.style.display = yaPagado ? "block" : "none";
-
-  // Si ya hay pago, solo dejar editable el campo de N° Factura (si aún no tiene)
+  avisoEl.style.display=yaPagado?"block":"none";
   if(yaPagado){
-    const fEl = document.getElementById("mpago-factura");
-    const tieneFact = x.factura && x.factura.trim() !== "";
-    fEl.readOnly = tieneFact;
-    fEl.style.background = tieneFact?"#f0f4fa":"#fff";
-    fEl.style.color = tieneFact?"#6b7694":"#1a1d2e";
-    if(tieneFact){
-      avisoEl.innerHTML = "✅ Factura, pago y comprobante ya registrados. Esta prefactura está cerrada.";
-    }
+    const fEl=document.getElementById("mpago-factura");
+    const tieneFact=x.factura&&x.factura.trim()!=="";
+    fEl.readOnly=tieneFact;
+    fEl.style.background=tieneFact?"#f0f4fa":"#fff";
+    fEl.style.color=tieneFact?"#6b7694":"#1a1d2e";
+    if(tieneFact) avisoEl.innerHTML="Factura, pago y comprobante ya registrados. Esta prefactura está cerrada.";
   }
-
-  const btnGuardar = document.querySelector("#modal-pago .btn-success");
-  if(btnGuardar){ btnGuardar.style.display = (yaPagado && x.factura && x.factura.trim()!=="") ? "none" : ""; }
-
+  const btnGuardar=document.querySelector("#modal-pago .btn-success");
+  if(btnGuardar) btnGuardar.style.display=(yaPagado&&x.factura&&x.factura.trim()!=="")?"none":"";
   function calcDif(){
     if(yaPagado) return;
     const v=parseFloat(document.getElementById("mpago-valor").value)||0;
@@ -1174,17 +1153,17 @@ function guardarPago(){
     x.estado="pendiente_pago";
     alert("⚠ Los datos fueron guardados pero la prefactura permanece PENDIENTE hasta que ingrese el N° de factura emitida.");
   }
-  // Enviar con nombres de campo explícitos y en orden correcto
   apiPost({
-    action:      'updateFactura',
-    id:          x.id,
-    factura:     x.factura,
-    valorPagado: x.valorPagado,
-    retencion:   x.retencion,
-    comprobante: x.comprobante,
-    estado:      x.estado,
-    fechaPago:   x.fechaPago,
-    obs:         x.obs||''
+    action:'updateFactura',
+    id:x.id,
+    npref:x.npref,
+    factura:x.factura,
+    valorPagado:x.valorPagado,
+    retencion:x.retencion,
+    comprobante:x.comprobante,
+    estado:x.estado,
+    fechaPago:x.fechaPago,
+    refPago:''
   });
   guardarLocalStorage();
   document.getElementById("modal-pago").classList.remove("open");
@@ -1194,41 +1173,20 @@ function guardarPago(){
 
 // Called when a new prefactura is confirmed - adds to facturas list as pending payment
 function reimprimirPF(facturaId){
-  // Buscar la factura
-  const f = facturas.find(x=>x.id===facturaId);
-  if(!f){ alert('No se encontró la prefactura.'); return; }
-  // Buscar datos del contratista
-  const cl = clientes.find(c=>c.nombre===f.cliente)||{};
-  // Construir objeto pf compatible con generarHTMLPF
-  const pf = {
-    id: f.npref || f.id,
-    cliente: f.cliente,
-    qty: f.qty,
-    servicio: f.servicio||'Almuerzo Operativo',
-    precioUnit: f.precioUnit||1.7217,
-    sub: f.subtotal||(f.qty*(f.precioUnit||1.7217)),
-    iva: f.iva||((f.subtotal||0)*0.15),
-    total: f.total,
-    refPago: f.refPago||'',
-    fecha: f.fecha||''
-  };
-  // Calcular sub/iva/total si faltan
-  if(!pf.sub || pf.sub===0){
-    pf.sub = parseFloat((pf.qty * pf.precioUnit).toFixed(4));
-    pf.iva = parseFloat((pf.sub * 0.15).toFixed(4));
-    pf.total = parseFloat((pf.sub + pf.iva).toFixed(4));
-  }
-  // Abrir ventana nueva solo con el contenido de la prefactura
-  const html = generarHTMLPF(pf, cl);
-  const pfNum = String(pf.id).padStart(5,'0');
-  const css = '<style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,sans-serif;font-size:12px;line-height:1.6;background:white;padding:10mm}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{padding:8px 12px;background:#0f1c3f;color:white;text-align:left}td{padding:10px 12px;border-bottom:1px solid #f0f2f5}.pf-num{font-size:20px;font-weight:700;color:#185FA5}.pf-print-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #0f1c3f}.pf-print-footer{margin-top:40px;padding-top:16px;border-top:1px solid #e2e6ed;font-size:11px;color:#6b7694;text-align:center}.hanaska-bar{height:4px;background:linear-gradient(90deg,#e63946 0%,#f4a261 25%,#2a9d8f 50%,#185FA5 75%,#0f1c3f 100%);margin-top:8px;border-radius:2px}</style>';
-  const winHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PF-' + pfNum + '</title>' + css + '</head><body>' + html + '</body></html>';
-  const win = window.open('', '_blank');
+  const f=facturas.find(x=>x.id===facturaId);
+  if(!f){alert('No se encontró la prefactura.');return;}
+  const cl=clientes.find(c=>c.nombre===f.cliente)||{};
+  const pf={id:f.npref||f.id,cliente:f.cliente,qty:f.qty,servicio:f.servicio||'Almuerzo Operativo',precioUnit:f.precioUnit||1.7217,sub:f.subtotal||(f.qty*(f.precioUnit||1.7217)),iva:f.iva||((f.subtotal||0)*0.15),total:f.total,fecha:f.fecha||''};
+  if(!pf.sub||pf.sub===0){pf.sub=parseFloat((pf.qty*pf.precioUnit).toFixed(4));pf.iva=parseFloat((pf.sub*0.15).toFixed(4));pf.total=parseFloat((pf.sub+pf.iva).toFixed(4));}
+  const pfNum=String(pf.id).padStart(5,'0');
+  const css='<style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,sans-serif;font-size:12px;background:white;padding:10mm}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{padding:8px 12px;background:#0f1c3f;color:white;text-align:left}td{padding:10px 12px;border-bottom:1px solid #f0f2f5}</style>';
+  const winHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PF-'+pfNum+'</title>'+css+'</head><body>'+generarHTMLPF(pf,cl)+'</body></html>';
+  const win=window.open('','_blank');
   win.document.write(winHtml);
   win.document.close();
   win.focus();
-  win.onload = function(){ setTimeout(function(){ win.print(); }, 400); };
-  setTimeout(function(){ if(!win.closed){ win.print(); } }, 1800);
+  win.onload=function(){setTimeout(function(){win.print();},400);};
+  setTimeout(function(){if(!win.closed){win.print();}},1800);
 }
 
 function agregarFacturaPendiente(pf){
@@ -1320,9 +1278,70 @@ function generarPedido(){
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
 
-  var thCols = '<th style="padding:8px 10px;text-align:left">Razón Social</th><th style="padding:8px 10px;text-align:left">RUC</th><th style="padding:8px 10px;text-align:left">Dirección</th><th style="padding:8px 10px;text-align:left">Teléfono</th><th style="padding:8px 10px;text-align:left">Correo</th><th style="padding:8px 8px;text-align:center">Cant.</th><th style="padding:8px 6px;text-align:center">R1</th><th style="padding:8px 6px;text-align:center">R2</th><th style="padding:8px 6px;text-align:center">R3</th><th style="padding:8px 6px;text-align:center">R4</th><th style="padding:8px 6px;text-align:center">R5</th><th style="padding:8px 6px;text-align:center">R6</th><th style="padding:8px 10px;text-align:left">Servicio</th><th style="padding:8px 10px;text-align:right">P. Neto</th><th style="padding:8px 10px;text-align:right">Subtotal</th><th style="padding:8px 10px;text-align:right">IVA 15%</th><th style="padding:8px 10px;text-align:right">Total</th>';
-  var filaRows = filas.map(function(r,i){ return '<tr style="border-bottom:1px solid #e2e6ed;background:'+(i%2===0?'white':'#f8f9fb')+'"><td style="padding:8px 10px;font-weight:600">'+r.f.cliente+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.ruc||'—')+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.dir||'—')+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.tel||'—')+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.correo||'—')+'</td><td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">'+r.f.qty+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R1']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R2']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R3']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R4']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R5']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R6']||'')+'</td><td style="padding:8px 10px">'+(r.f.servicio||'Almuerzo Operativo')+'</td><td style="padding:8px 10px;text-align:right">$'+r.precioU.toFixed(4).replace('.',',')+'</td><td style="padding:8px 10px;text-align:right">'+fmt(r.sub)+'</td><td style="padding:8px 10px;text-align:right">'+fmt(r.iva)+'</td><td style="padding:8px 10px;text-align:right;font-weight:700">'+fmt(r.tot)+'</td></tr>'; }).join('');
-  var html = '<div style="font-family:Inter,sans-serif;font-size:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #185FA5"><div style="font-size:15px;font-weight:700;color:#185FA5">HANASKA · Rosaprima</div><div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#0f1c3f">PEDIDO DE FACTURACIÓN</div><div style="font-size:11px;color:#6b7694">Fecha: '+hoy+'</div></div></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:960px"><thead><tr style="background:#0f1c3f;color:white">'+thCols+'</tr></thead><tbody>'+filaRows+'</tbody><tfoot><tr style="background:#0f1c3f;color:white;font-weight:700"><td colspan="14" style="padding:10px 12px;text-align:right">TOTALES</td><td style="padding:10px;text-align:right">'+fmt(totales.sub)+'</td><td style="padding:10px;text-align:right">'+fmt(totales.iva)+'</td><td style="padding:10px;text-align:right">'+fmt(totales.tot)+'</td></tr></tfoot></table></div></div>';
+  const html = `<div style="font-family:Inter,sans-serif;font-size:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #185FA5">
+      <div style="font-size:15px;font-weight:700;color:#185FA5">HANASKA · Rosaprima</div>
+      <div style="text-align:right">
+        <div style="font-size:13px;font-weight:700;color:#0f1c3f">PEDIDO DE FACTURACIÓN</div>
+        <div style="font-size:11px;color:#6b7694">Fecha: ${hoy}</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:960px">
+      <thead>
+        <tr style="background:#0f1c3f;color:white">
+          <th style="padding:8px 10px;text-align:left">Razón Social</th>
+          <th style="padding:8px 10px;text-align:left">RUC</th>
+          <th style="padding:8px 10px;text-align:left">Dirección</th>
+          <th style="padding:8px 10px;text-align:left">Teléfono</th>
+          <th style="padding:8px 10px;text-align:left">Correo</th>
+          <th style="padding:8px 8px;text-align:center">Cant.</th>
+          <th style="padding:8px 6px;text-align:center">R1</th>
+          <th style="padding:8px 6px;text-align:center">R2</th>
+          <th style="padding:8px 6px;text-align:center">R3</th>
+          <th style="padding:8px 6px;text-align:center">R4</th>
+          <th style="padding:8px 6px;text-align:center">R5</th>
+          <th style="padding:8px 6px;text-align:center">R6</th>
+          <th style="padding:8px 10px;text-align:left">Servicio</th>
+          <th style="padding:8px 10px;text-align:right">P. Neto</th>
+          <th style="padding:8px 10px;text-align:right">Subtotal</th>
+          <th style="padding:8px 10px;text-align:right">IVA 15%</th>
+          <th style="padding:8px 10px;text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filas.map((r,i)=>`
+        <tr style="border-bottom:1px solid #e2e6ed;background:${i%2===0?'white':'#f8f9fb'}">
+          <td style="padding:8px 10px;font-weight:600">${r.f.cliente}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.ruc||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.dir||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.tel||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.correo||'—'}</td>
+          <td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R1']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R2']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R3']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R4']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R5']||''}</td>
+          <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
+          <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
+          <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
+          <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
+          <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#0f1c3f;color:white;font-weight:700">
+          <td colspan="14" style="padding:10px 12px;text-align:right">TOTALES</td>
+          <td style="padding:10px;text-align:right">${fmt(totales.sub)}</td>
+          <td style="padding:10px;text-align:right">${fmt(totales.iva)}</td>
+          <td style="padding:10px;text-align:right">${fmt(totales.tot)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>
+  </div>`;
 
   document.getElementById('pedido-content').innerHTML = html;
 }
@@ -1363,9 +1382,77 @@ function descargarPedidoPDF(){
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
 
   const area = document.getElementById('print-area');
-  var thColsPDF = '<th style="padding:7px 8px;text-align:left">Razón Social</th><th style="padding:7px 8px;text-align:left">RUC</th><th style="padding:7px 8px;text-align:left">Dirección</th><th style="padding:7px 6px;text-align:left">Teléfono</th><th style="padding:7px 6px;text-align:left">Correo</th><th style="padding:7px 6px;text-align:center">Cant.</th><th style="padding:7px 4px;text-align:center">R1</th><th style="padding:7px 4px;text-align:center">R2</th><th style="padding:7px 4px;text-align:center">R3</th><th style="padding:7px 4px;text-align:center">R4</th><th style="padding:7px 4px;text-align:center">R5</th><th style="padding:7px 4px;text-align:center">R6</th><th style="padding:7px 8px;text-align:left">Servicio</th><th style="padding:7px 8px;text-align:right">P. Neto</th><th style="padding:7px 8px;text-align:right">Subtotal</th><th style="padding:7px 8px;text-align:right">IVA 15%</th><th style="padding:7px 8px;text-align:right">Total</th>';
-  var filasPDF = filas.map(function(r,i){ return '<tr style="background:'+(i%2===0?'white':'#f0f6fe')+';border-bottom:1px solid #e2e6ed"><td style="padding:7px 8px;font-weight:600">'+r.f.cliente+'</td><td style="padding:7px 8px;color:#555">'+(r.cli.ruc||'—')+'</td><td style="padding:7px 8px;color:#555">'+(r.cli.dir||'—')+'</td><td style="padding:7px 6px;color:#555">'+(r.cli.tel||'—')+'</td><td style="padding:7px 6px;color:#555">'+(r.cli.correo||'—')+'</td><td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">'+r.f.qty+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R1']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R2']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R3']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R4']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R5']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R6']||'')+'</td><td style="padding:7px 8px">'+(r.f.servicio||'Almuerzo Operativo')+'</td><td style="padding:7px 8px;text-align:right">$'+r.precioU.toFixed(4).replace('.',',')+'</td><td style="padding:7px 8px;text-align:right">'+fmt(r.sub)+'</td><td style="padding:7px 8px;text-align:right">'+fmt(r.iva)+'</td><td style="padding:7px 8px;text-align:right;font-weight:700">'+fmt(r.tot)+'</td></tr>'; }).join('');
-  area.innerHTML = '<div style="padding:28px;max-width:1100px;margin:0 auto;font-family:Inter,sans-serif;font-size:11px"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #0f1c3f"><div><div style="font-size:18px;font-weight:700;color:#0f1c3f">HANASKA · Rosaprima</div><div style="height:4px;width:140px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);border-radius:2px;margin-top:6px"></div></div><div style="text-align:right"><div style="font-size:15px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div><div style="font-size:11px;color:#6b7694;margin-top:4px">Fecha: '+hoy+'</div></div></div><table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="background:#0f1c3f;color:white">'+thColsPDF+'</tr></thead><tbody>'+filasPDF+'</tbody><tfoot><tr style="background:#0f1c3f;color:white;font-weight:700"><td colspan="14" style="padding:8px 10px;text-align:right">TOTALES</td><td style="padding:8px;text-align:right">'+fmt(totales.sub)+'</td><td style="padding:8px;text-align:right">'+fmt(totales.iva)+'</td><td style="padding:8px;text-align:right">'+fmt(totales.tot)+'</td></tr></tfoot></table><div style="margin-top:30px;padding-top:12px;border-top:1px solid #e2e6ed;text-align:center;font-size:10px;color:#6b7694"><div style="height:3px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);margin-bottom:8px;border-radius:2px"></div>Elaborado por: <strong>Ing. Carlos Velástegui</strong> · Administrador · Hanaska · '+hoy+'</div></div>';
+  area.innerHTML = `
+  <div style="padding:28px;max-width:1100px;margin:0 auto;font-family:Inter,sans-serif;font-size:11px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #0f1c3f">
+      <div>
+        <div style="font-size:18px;font-weight:700;color:#0f1c3f">HANASKA · Rosaprima</div>
+        <div style="height:4px;width:140px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);border-radius:2px;margin-top:6px"></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:15px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
+        <div style="font-size:11px;color:#6b7694;margin-top:4px">Fecha: ${hoy}</div>
+      </div>
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-size:10px">
+      <thead>
+        <tr style="background:#0f1c3f;color:white">
+          <th style="padding:7px 8px;text-align:left">Razón Social</th>
+          <th style="padding:7px 8px;text-align:left">RUC</th>
+          <th style="padding:7px 8px;text-align:left">Dirección</th>
+          <th style="padding:7px 6px;text-align:left">Teléfono</th>
+          <th style="padding:7px 6px;text-align:left">Correo</th>
+          <th style="padding:7px 6px;text-align:center">Cant.</th>
+          <th style="padding:7px 4px;text-align:center">R1</th>
+          <th style="padding:7px 4px;text-align:center">R2</th>
+          <th style="padding:7px 4px;text-align:center">R3</th>
+          <th style="padding:7px 4px;text-align:center">R4</th>
+          <th style="padding:7px 4px;text-align:center">R5</th>
+          <th style="padding:7px 4px;text-align:center">R6</th>
+          <th style="padding:7px 8px;text-align:left">Servicio</th>
+          <th style="padding:7px 8px;text-align:right">P. Neto</th>
+          <th style="padding:7px 8px;text-align:right">Subtotal</th>
+          <th style="padding:7px 8px;text-align:right">IVA 15%</th>
+          <th style="padding:7px 8px;text-align:right">Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filas.map((r,i)=>`
+        <tr style="background:${i%2===0?'white':'#f0f6fe'};border-bottom:1px solid #e2e6ed">
+          <td style="padding:7px 8px;font-weight:600">${r.f.cliente}</td>
+          <td style="padding:7px 8px;color:#555">${r.cli.ruc||'—'}</td>
+          <td style="padding:7px 8px;color:#555">${r.cli.dir||'—'}</td>
+          <td style="padding:7px 6px;color:#555">${r.cli.tel||'—'}</td>
+          <td style="padding:7px 6px;color:#555">${r.cli.correo||'—'}</td>
+          <td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R1']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R2']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R3']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R4']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R5']||''}</td>
+          <td style="padding:7px 4px;text-align:center">${r.porFinca['R6']||''}</td>
+          <td style="padding:7px 8px">${r.f.servicio||'Almuerzo Operativo'}</td>
+          <td style="padding:7px 8px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
+          <td style="padding:7px 8px;text-align:right">${fmt(r.sub)}</td>
+          <td style="padding:7px 8px;text-align:right">${fmt(r.iva)}</td>
+          <td style="padding:7px 8px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
+        </tr>`).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:#0f1c3f;color:white;font-weight:700">
+          <td colspan="14" style="padding:8px 10px;text-align:right">TOTALES</td>
+          <td style="padding:8px;text-align:right">${fmt(totales.sub)}</td>
+          <td style="padding:8px;text-align:right">${fmt(totales.iva)}</td>
+          <td style="padding:8px;text-align:right">${fmt(totales.tot)}</td>
+        </tr>
+      </tfoot>
+    </table>
+    <div style="margin-top:30px;padding-top:12px;border-top:1px solid #e2e6ed;text-align:center;font-size:10px;color:#6b7694">
+      <div style="height:3px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);margin-bottom:8px;border-radius:2px"></div>
+      Elaborado por: <strong>Ing. Carlos Velástegui</strong> · Administrador · Hanaska · ${hoy}
+    </div>
+  </div>`;
+
   area.style.display = 'block';
   document.querySelectorAll('.app').forEach(e=>e.style.display='none');
   document.getElementById('modal-pedido-fact').classList.remove('open');
@@ -1390,14 +1477,7 @@ function renderCuentas(){
     const pct=Math.min(100,Math.max(0,Math.round((con/(con+Math.max(saldo,0)||1))*100)));
     const histP=allPFs.slice(-5).reverse();
     const histC=allCons.slice(-8).reverse();
-    // Para cada prefactura, buscar si existe una factura pagada con ese npref
-    function pfTieneFactura(pf){
-      const f = facturas.find(x=> String(x.npref)===String(pf.id) || String(x.npref)===String(pf.qty));
-      if(f) return f.factura && f.factura.trim()!=='' && f.estado==='pagado';
-      // También verificar por estado en la propia prefactura
-      return pf.estado==='pagado' || (pf.factura && pf.factura.trim()!=='');
-    }
-    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+(saldo>20?"badge-ok":saldo>0?"badge-pending":"badge-red")+'">'+saldo+' alm. disponibles</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7694;margin-bottom:6px"><span>Saldo actual: <strong>'+saldo+'</strong> alm.</span><span>'+pct+'% consumido</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldo>20?"#3B6D11":saldo>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th></tr></thead><tbody>'+histP.map(p=>{ const ok=pfTieneFactura(p); return '<tr><td style="padding:5px 8px;font-weight:600;color:#3B6D11">+'+p.qty+'</td><td style="padding:5px 8px;color:#6b7694">'+p.fecha+'</td><td style="padding:5px 8px"><span class="badge '+(ok?"badge-ok":"badge-pending")+'" style="font-size:10px">'+(ok?'Pagado':'Pend.')+'</span></td></tr>'; }).join("")+'</tbody></table></div><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimos consumos</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Finca</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th></tr></thead><tbody>'+(histC.length?histC.map(x=>'<tr><td style="padding:5px 8px;color:#6b7694">'+x.fecha+'</td><td style="padding:5px 8px">'+fb(x.finca||"R1")+'</td><td style="padding:5px 8px;font-weight:600;color:#A32D2D">-'+x.qty+'</td></tr>').join(""):'<tr><td colspan="3" style="padding:10px 8px;color:#6b7694;text-align:center">Sin consumos</td></tr>')+'</tbody></table></div></div></div>';
+    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+(saldo>20?"badge-ok":saldo>0?"badge-pending":"badge-red")+'">'+saldo+' alm. disponibles</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7694;margin-bottom:6px"><span>Saldo actual: <strong>'+saldo+'</strong> alm.</span><span>'+pct+'% consumido</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldo>20?"#3B6D11":saldo>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th></tr></thead><tbody>'+histP.map(function(p){const ok=facturas.some(function(f){return String(f.npref)===String(p.id)&&f.factura&&f.factura.trim()!==''&&f.estado==='pagado';})||(p.estado==='pagado');return '<tr><td style="padding:5px 8px;font-weight:600;color:#3B6D11">+'+p.qty+'</td><td style="padding:5px 8px;color:#6b7694">'+p.fecha.toString().slice(0,10)+'</td><td style="padding:5px 8px"><span class="badge '+(ok?"badge-ok":"badge-pending")+'" style="font-size:10px">'+(ok?"Pagado":"Pend.")+'</span></td></tr>'; }).join("")+'</tbody></table></div><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimos consumos</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Finca</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th></tr></thead><tbody>'+(histC.length?histC.map(x=>'<tr><td style="padding:5px 8px;color:#6b7694">'+x.fecha+'</td><td style="padding:5px 8px">'+fb(x.finca||"R1")+'</td><td style="padding:5px 8px;font-weight:600;color:#A32D2D">-'+x.qty+'</td></tr>').join(""):'<tr><td colspan="3" style="padding:10px 8px;color:#6b7694;text-align:center">Sin consumos</td></tr>')+'</tbody></table></div></div></div>';
   }).join("");
 }
 
