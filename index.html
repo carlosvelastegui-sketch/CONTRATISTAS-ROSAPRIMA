@@ -1086,7 +1086,7 @@ function renderControl(){
       +'<td>'+(isPaid
         ?'<span class="badge badge-ok">Pagado</span>'
         :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
-      +'<td>'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':"")+'</td>'
+      +'<td style="display:flex;gap:6px">'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':"")+'<button class="btn btn-pdf btn-sm" onclick="reimprimirPF('+x.id+')"><i class="ti ti-file-type-pdf"></i> PDF</button></td>'
       +'</tr>';
   }).join("");
 }
@@ -1196,6 +1196,41 @@ function guardarPago(){
 }
 
 // Called when a new prefactura is confirmed - adds to facturas list as pending payment
+function reimprimirPF(facturaId){
+  // Buscar la factura
+  const f = facturas.find(x=>x.id===facturaId);
+  if(!f){ alert('No se encontró la prefactura.'); return; }
+  // Buscar datos del contratista
+  const cl = clientes.find(c=>c.nombre===f.cliente)||{};
+  // Construir objeto pf compatible con generarHTMLPF
+  const pf = {
+    id: f.npref || f.id,
+    cliente: f.cliente,
+    qty: f.qty,
+    servicio: f.servicio||'Almuerzo Operativo',
+    precioUnit: f.precioUnit||1.7217,
+    sub: f.subtotal||(f.qty*(f.precioUnit||1.7217)),
+    iva: f.iva||((f.subtotal||0)*0.15),
+    total: f.total,
+    refPago: f.refPago||'',
+    fecha: f.fecha||''
+  };
+  // Calcular sub/iva/total si faltan
+  if(!pf.sub || pf.sub===0){
+    pf.sub = parseFloat((pf.qty * pf.precioUnit).toFixed(4));
+    pf.iva = parseFloat((pf.sub * 0.15).toFixed(4));
+    pf.total = parseFloat((pf.sub + pf.iva).toFixed(4));
+  }
+  // Mostrar en print-area e imprimir
+  const area = document.getElementById('print-area');
+  area.innerHTML = generarHTMLPF(pf, cl);
+  area.style.display = 'block';
+  setTimeout(function(){
+    window.print();
+    area.style.display = 'none';
+  }, 300);
+}
+
 function agregarFacturaPendiente(pf){
   // Evitar duplicados: no agregar si ya existe una factura con el mismo npref Y qty
   if(facturas.find(f=>String(f.npref)===String(pf.id) && parseInt(f.qty)===parseInt(pf.qty))) return;
