@@ -120,14 +120,18 @@ tbody tr:hover td{background:#f8f9fb}
 /* PDF print */
 @media print{
   @page { size: A4 landscape; margin: 10mm; }
-  html, body { width: 100%; height: 100%; }
-  .sidebar,.topbar,.actions,.btn,.step-bar,.no-print{display:none!important}
-  #print-area { transform-origin: top left; width: 100% !important; }
-  .main{overflow:visible!important}
-  .content{overflow:visible!important;padding:0!important;background:white!important}
-  .tab-content{display:none!important}
-  #print-area{display:block!important}
-  body{background:white}
+  *{ visibility: hidden; }
+  #print-area, #print-area *{ visibility: visible; }
+  #print-area{
+    display: block !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    background: white !important;
+  }
 }
 #print-area{display:none}
 .pf-print-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:2px solid #0f1c3f}
@@ -262,12 +266,7 @@ tbody tr:hover td{background:#f8f9fb}
             <div class="form-row">
               <div class="form-group"><label>Cantidad</label>
                 <input type="number" id="p-qty" min="1" value="50" oninput="calcPF()"></div>
-              <div class="form-group"><label>Precio unitario (neto)</label>
-                <input type="text" id="p-precio-display" readonly></div>
-            </div>
-            <div class="form-group" style="margin-bottom:12px"><label>Referencia de pago / transferencia</label>
-              <input type="text" id="p-refpago" placeholder="Ej: TRF-2026-001"></div>
-            <div class="resumen-box">
+              <div class="resumen-box">
               <div class="r-titulo">Resumen</div>
               <div class="r-linea"><span>Cantidad</span><span id="pc-qty">50</span></div>
               <div class="r-linea"><span>Precio unitario (neto)</span><span id="pc-unit">$1.7217</span></div>
@@ -336,7 +335,6 @@ tbody tr:hover td{background:#f8f9fb}
               <th>Servicio</th>
               <th class="num">Alm.</th>
               <th class="num">Total</th>
-              <th>Ref. Pago</th>
               <th class="num">Valor Pagado</th>
               <th class="num">Retención</th>
               <th>N° Comprobante</th>
@@ -929,14 +927,13 @@ function irPS2(){
   const qty=parseInt(document.getElementById("p-qty").value)||0;
   if(!qty){alert("Ingresa la cantidad");return;}
   const fecha=document.getElementById("p-fecha").value;
-  const ref=document.getElementById("p-refpago").value;
   const servNombre=document.getElementById("p-servicio")?.value||"Almuerzo Operativo";
   const precioObj=PRECIOS_SERVICIOS[servNombre]||{neto:1.7217,iva:0.2583,total:1.98};
   const sub=parseFloat((qty*precioObj.neto).toFixed(4));
   const iva=parseFloat((sub*0.15).toFixed(6));
   const total=parseFloat((sub+iva).toFixed(6));
   const cl=clientes.find(c=>c.nombre===cli)||{ruc:"-",tel:"-",dir:"-"};
-  curPF={id:nextPFid,cliente:cli,qty,servicio:servNombre,precioUnit:precioObj.neto,sub,iva,total,refPago:ref,factura:"",fecha,estado:"pendiente"};
+  curPF={id:nextPFid,cliente:cli,qty,servicio:servNombre,precioUnit:precioObj.neto,sub,iva,total,refPago:'',factura:"",fecha,estado:"pendiente"};
   document.getElementById("pf-preview").innerHTML=generarHTMLPF(curPF, cl);
   ["ppaso1","ppaso2","ppaso3"].forEach((p,i)=>document.getElementById(p).style.display=i===1?"":"none");
   document.getElementById("ps1").className="step done";
@@ -1084,7 +1081,6 @@ function renderControl(){
       +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
       +'<td class="num">'+x.qty+'</td>'
       +'<td class="num">'+fmt(x.total)+'</td>'
-      +'<td style="font-size:11px;color:#6b7694">'+(x.refPago||"—")+'</td>'
       +'<td class="num">'+(isPaid?fmt(x.valorPagado):"—")+'</td>'
       +'<td class="num">'+(x.retencion?fmt(x.retencion):"—")+'</td>'
       +'<td style="font-size:11px;color:#6b7694">'+(x.comprobante||"—")+'</td>'
@@ -1109,12 +1105,12 @@ function abrirModalPago(id){
     +'</div>';
   // Determinar si ya tiene pago y comprobante registrados
   // yaPagado: tiene valor pagado Y (comprobante O refPago)
-  const yaPagado = x.valorPagado > 0 && (x.comprobante || x.refPago);
+  const yaPagado = x.valorPagado > 0 && x.comprobante;
   const camposModal = ["mpago-factura","mpago-fecha","mpago-comprobante","mpago-valor","mpago-retencion","mpago-obs"];
 
   document.getElementById("mpago-factura").value=x.factura;
   document.getElementById("mpago-fecha").value=x.fechaPago||new Date().toISOString().split("T")[0];
-  document.getElementById("mpago-comprobante").value=x.comprobante||x.refPago||"";
+  document.getElementById("mpago-comprobante").value=x.comprobante||"";
   document.getElementById("mpago-valor").value=yaPagado?parseNum(x.valorPagado).toFixed(2):parseNum(x.total).toFixed(2);
   document.getElementById("mpago-retencion").value=x.retencion||"0";
   document.getElementById("mpago-dif").value="0.00";
@@ -1191,7 +1187,6 @@ function guardarPago(){
     comprobante: x.comprobante,
     estado:      x.estado,
     fechaPago:   x.fechaPago,
-    refPago:     x.refPago,
     obs:         x.obs||''
   });
   guardarLocalStorage();
