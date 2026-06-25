@@ -199,7 +199,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="form-row">
             <div class="form-group"><label>Contratista</label>
               <select id="c-cliente" onchange="mostrarSaldo()"><option value="">Seleccione...</option></select></div>
-            <div class="form-group"><label>Fecha por defecto</label><input type="date" id="c-fecha" onchange="actualizarFechasLineas()"></div>
+            <div class="form-group"><label>Fecha</label><input type="date" id="c-fecha"></div>
           </div>
           <div id="saldo-display" style="display:none">
             <div class="saldo-card" id="saldo-card">
@@ -801,17 +801,9 @@ function agregarLinea(finca,qty){
   const id=lcCount;
   const div=document.createElement("div");
   div.className="linea-row"; div.id="lc-"+id;
-  const hoy=document.getElementById("c-fecha").value||today;
-  div.innerHTML='<select id="lcf-'+id+'" onchange="recalcCons()" style="font-size:12px;padding:6px 8px">'+FINCAS.map(f=>'<option value="'+f+'"'+(f===finca?" selected":"")+'>'+f+'</option>').join("")+'</select><div style="font-size:12px;color:#6b7694;padding:0 4px">Almuerzo Operativo</div><input type="date" id="lcd-'+id+'" value="'+hoy+'" style="font-size:12px;padding:6px 8px;border:1px solid #e2e6ed;border-radius:6px"><input type="number" id="lcq-'+id+'" value="'+qty+'" min="1" oninput="recalcCons()" style="font-size:14px;font-weight:700;padding:6px 8px;text-align:center"><span id="lcs-'+id+'" style="font-size:13px;font-weight:600;color:#185FA5;text-align:right;padding-right:4px">'+qty+' alm.</span><button onclick="document.getElementById(\'lc-'+id+'\').remove();recalcCons()" style="padding:6px;border-radius:6px;border:1px solid #f0f2f5;background:#FCEBEB;color:#A32D2D;cursor:pointer"><i class="ti ti-x" style="font-size:14px"></i></button>';
+  div.innerHTML='<select id="lcf-'+id+'" onchange="recalcCons()" style="font-size:12px;padding:6px 8px">'+FINCAS.map(f=>'<option value="'+f+'"'+(f===finca?" selected":"")+'>'+f+'</option>').join("")+'</select><div style="font-size:12px;color:#6b7694;padding:0 4px">Almuerzo Operativo</div><input type="number" id="lcq-'+id+'" value="'+qty+'" min="1" oninput="recalcCons()" style="font-size:14px;font-weight:700;padding:6px 8px;text-align:center"><span id="lcs-'+id+'" style="font-size:13px;font-weight:600;color:#185FA5;text-align:right;padding-right:4px">'+qty+' alm.</span><button onclick="document.getElementById(\'lc-'+id+'\').remove();recalcCons()" style="padding:6px;border-radius:6px;border:1px solid #f0f2f5;background:#FCEBEB;color:#A32D2D;cursor:pointer"><i class="ti ti-x" style="font-size:14px"></i></button>';
   document.getElementById("lineas-consumo").appendChild(div);
   recalcCons();
-}
-
-function actualizarFechasLineas(){
-  const fecha = document.getElementById("c-fecha").value;
-  document.querySelectorAll("[id^='lcd-']").forEach(el=>{
-    if(!el.value || el.value === today) el.value = fecha;
-  });
 }
 
 function getLineas(){
@@ -820,8 +812,7 @@ function getLineas(){
     const id=r.id.split("-")[1];
     const f=document.getElementById("lcf-"+id)?.value;
     const q=parseInt(document.getElementById("lcq-"+id)?.value)||0;
-    const d=document.getElementById("lcd-"+id)?.value||document.getElementById("c-fecha").value||today;
-    if(f&&q) l.push({finca:f,qty:q,fecha:d});
+    if(f&&q) l.push({finca:f,qty:q});
   });
   return l;
 }
@@ -859,7 +850,7 @@ async function registrarConsumo(){
   const btn = document.getElementById('btn-registrar-consumo');
   if(btn){ btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader"></i> Guardando en la nube...'; }
 
-  const pendientes = lineas.map(l=>({id:nextCONid++,cliente:n,qty:l.qty,finca:l.finca,fecha:l.fecha||fecha,obs}));
+  const pendientes = lineas.map(l=>({id:nextCONid++,cliente:n,qty:l.qty,finca:l.finca,fecha,obs}));
   const guardados = [];
   try {
     for(const nc of pendientes){
