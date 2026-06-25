@@ -946,7 +946,19 @@ function irPS2(){
 function getFincaBreakdown(cliente, fechaHasta, qtyTotal){
   const todosC = consumosHistoricos.concat(consumos);
   // Limpiar fechas con formato ISO (2026-06-01T05:00:00.000Z) a solo YYYY-MM-DD
-  const limpiarFecha = function(f){ return f ? String(f).slice(0,10) : ''; };
+  const limpiarFecha = function(f){
+    if(!f) return '';
+    const s = String(f);
+    // Formato ISO: 2026-06-01T05:00:00.000Z
+    if(s.includes('T')) return s.slice(0,10);
+    // Formato DD/MM/YYYY: 18/06/2026
+    if(s.includes('/') && s.length===10){
+      const p=s.split('/');
+      return p[2]+'-'+p[1]+'-'+p[0];
+    }
+    // Formato YYYY-MM-DD: ya correcto
+    return s.slice(0,10);
+  };
   const anteriores = facturas
     .filter(x=>x.cliente===cliente && x.fecha && limpiarFecha(x.fecha) < limpiarFecha(fechaHasta))
     .map(x=>limpiarFecha(x.fecha))
