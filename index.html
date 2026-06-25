@@ -1317,70 +1317,9 @@ function generarPedido(){
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
 
-  const html = `<div style="font-family:Inter,sans-serif;font-size:12px">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #185FA5">
-      <div style="font-size:15px;font-weight:700;color:#185FA5">HANASKA · Rosaprima</div>
-      <div style="text-align:right">
-        <div style="font-size:13px;font-weight:700;color:#0f1c3f">PEDIDO DE FACTURACIÓN</div>
-        <div style="font-size:11px;color:#6b7694">Fecha: ${hoy}</div>
-      </div>
-    </div>
-    <div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:960px">
-      <thead>
-        <tr style="background:#0f1c3f;color:white">
-          <th style="padding:8px 10px;text-align:left">Razón Social</th>
-          <th style="padding:8px 10px;text-align:left">RUC</th>
-          <th style="padding:8px 10px;text-align:left">Dirección</th>
-          <th style="padding:8px 10px;text-align:left">Teléfono</th>
-          <th style="padding:8px 10px;text-align:left">Correo</th>
-          <th style="padding:8px 8px;text-align:center">Cant.</th>
-          <th style="padding:8px 6px;text-align:center">R1</th>
-          <th style="padding:8px 6px;text-align:center">R2</th>
-          <th style="padding:8px 6px;text-align:center">R3</th>
-          <th style="padding:8px 6px;text-align:center">R4</th>
-          <th style="padding:8px 6px;text-align:center">R5</th>
-          <th style="padding:8px 6px;text-align:center">R6</th>
-          <th style="padding:8px 10px;text-align:left">Servicio</th>
-          <th style="padding:8px 10px;text-align:right">P. Neto</th>
-          <th style="padding:8px 10px;text-align:right">Subtotal</th>
-          <th style="padding:8px 10px;text-align:right">IVA 15%</th>
-          <th style="padding:8px 10px;text-align:right">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${filas.map((r,i)=>`
-        <tr style="border-bottom:1px solid #e2e6ed;background:${i%2===0?'white':'#f8f9fb'}">
-          <td style="padding:8px 10px;font-weight:600">${r.f.cliente}</td>
-          <td style="padding:8px 10px;color:#6b7694">${r.cli.ruc||'—'}</td>
-          <td style="padding:8px 10px;color:#6b7694">${r.cli.dir||'—'}</td>
-          <td style="padding:8px 10px;color:#6b7694">${r.cli.tel||'—'}</td>
-          <td style="padding:8px 10px;color:#6b7694">${r.cli.correo||'—'}</td>
-          <td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R1']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R2']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R3']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R4']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R5']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
-          <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
-          <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
-          <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
-          <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
-          <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
-        </tr>`).join('')}
-      </tbody>
-      <tfoot>
-        <tr style="background:#0f1c3f;color:white;font-weight:700">
-          <td colspan="14" style="padding:10px 12px;text-align:right">TOTALES</td>
-          <td style="padding:10px;text-align:right">${fmt(totales.sub)}</td>
-          <td style="padding:10px;text-align:right">${fmt(totales.iva)}</td>
-          <td style="padding:10px;text-align:right">${fmt(totales.tot)}</td>
-        </tr>
-      </tfoot>
-    </table>
-    </div>
-  </div>`;
+  var thCols = '<th style="padding:8px 10px;text-align:left">Razón Social</th><th style="padding:8px 10px;text-align:left">RUC</th><th style="padding:8px 10px;text-align:left">Dirección</th><th style="padding:8px 10px;text-align:left">Teléfono</th><th style="padding:8px 10px;text-align:left">Correo</th><th style="padding:8px 8px;text-align:center">Cant.</th><th style="padding:8px 6px;text-align:center">R1</th><th style="padding:8px 6px;text-align:center">R2</th><th style="padding:8px 6px;text-align:center">R3</th><th style="padding:8px 6px;text-align:center">R4</th><th style="padding:8px 6px;text-align:center">R5</th><th style="padding:8px 6px;text-align:center">R6</th><th style="padding:8px 10px;text-align:left">Servicio</th><th style="padding:8px 10px;text-align:right">P. Neto</th><th style="padding:8px 10px;text-align:right">Subtotal</th><th style="padding:8px 10px;text-align:right">IVA 15%</th><th style="padding:8px 10px;text-align:right">Total</th>';
+  var filaRows = filas.map(function(r,i){ return '<tr style="border-bottom:1px solid #e2e6ed;background:'+(i%2===0?'white':'#f8f9fb')+'"><td style="padding:8px 10px;font-weight:600">'+r.f.cliente+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.ruc||'—')+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.dir||'—')+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.tel||'—')+'</td><td style="padding:8px 10px;color:#6b7694">'+(r.cli.correo||'—')+'</td><td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">'+r.f.qty+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R1']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R2']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R3']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R4']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R5']||'')+'</td><td style="padding:8px 6px;text-align:center">'+(r.porFinca['R6']||'')+'</td><td style="padding:8px 10px">'+(r.f.servicio||'Almuerzo Operativo')+'</td><td style="padding:8px 10px;text-align:right">$'+r.precioU.toFixed(4).replace('.',',')+'</td><td style="padding:8px 10px;text-align:right">'+fmt(r.sub)+'</td><td style="padding:8px 10px;text-align:right">'+fmt(r.iva)+'</td><td style="padding:8px 10px;text-align:right;font-weight:700">'+fmt(r.tot)+'</td></tr>'; }).join('');
+  var html = '<div style="font-family:Inter,sans-serif;font-size:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #185FA5"><div style="font-size:15px;font-weight:700;color:#185FA5">HANASKA · Rosaprima</div><div style="text-align:right"><div style="font-size:13px;font-weight:700;color:#0f1c3f">PEDIDO DE FACTURACIÓN</div><div style="font-size:11px;color:#6b7694">Fecha: '+hoy+'</div></div></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:960px"><thead><tr style="background:#0f1c3f;color:white">'+thCols+'</tr></thead><tbody>'+filaRows+'</tbody><tfoot><tr style="background:#0f1c3f;color:white;font-weight:700"><td colspan="14" style="padding:10px 12px;text-align:right">TOTALES</td><td style="padding:10px;text-align:right">'+fmt(totales.sub)+'</td><td style="padding:10px;text-align:right">'+fmt(totales.iva)+'</td><td style="padding:10px;text-align:right">'+fmt(totales.tot)+'</td></tr></tfoot></table></div></div>';
 
   document.getElementById('pedido-content').innerHTML = html;
 }
@@ -1421,77 +1360,9 @@ function descargarPedidoPDF(){
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
 
   const area = document.getElementById('print-area');
-  area.innerHTML = `
-  <div style="padding:28px;max-width:1100px;margin:0 auto;font-family:Inter,sans-serif;font-size:11px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #0f1c3f">
-      <div>
-        <div style="font-size:18px;font-weight:700;color:#0f1c3f">HANASKA · Rosaprima</div>
-        <div style="height:4px;width:140px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);border-radius:2px;margin-top:6px"></div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:15px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div>
-        <div style="font-size:11px;color:#6b7694;margin-top:4px">Fecha: ${hoy}</div>
-      </div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;font-size:10px">
-      <thead>
-        <tr style="background:#0f1c3f;color:white">
-          <th style="padding:7px 8px;text-align:left">Razón Social</th>
-          <th style="padding:7px 8px;text-align:left">RUC</th>
-          <th style="padding:7px 8px;text-align:left">Dirección</th>
-          <th style="padding:7px 6px;text-align:left">Teléfono</th>
-          <th style="padding:7px 6px;text-align:left">Correo</th>
-          <th style="padding:7px 6px;text-align:center">Cant.</th>
-          <th style="padding:7px 4px;text-align:center">R1</th>
-          <th style="padding:7px 4px;text-align:center">R2</th>
-          <th style="padding:7px 4px;text-align:center">R3</th>
-          <th style="padding:7px 4px;text-align:center">R4</th>
-          <th style="padding:7px 4px;text-align:center">R5</th>
-          <th style="padding:7px 4px;text-align:center">R6</th>
-          <th style="padding:7px 8px;text-align:left">Servicio</th>
-          <th style="padding:7px 8px;text-align:right">P. Neto</th>
-          <th style="padding:7px 8px;text-align:right">Subtotal</th>
-          <th style="padding:7px 8px;text-align:right">IVA 15%</th>
-          <th style="padding:7px 8px;text-align:right">Total</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${filas.map((r,i)=>`
-        <tr style="background:${i%2===0?'white':'#f0f6fe'};border-bottom:1px solid #e2e6ed">
-          <td style="padding:7px 8px;font-weight:600">${r.f.cliente}</td>
-          <td style="padding:7px 8px;color:#555">${r.cli.ruc||'—'}</td>
-          <td style="padding:7px 8px;color:#555">${r.cli.dir||'—'}</td>
-          <td style="padding:7px 6px;color:#555">${r.cli.tel||'—'}</td>
-          <td style="padding:7px 6px;color:#555">${r.cli.correo||'—'}</td>
-          <td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R1']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R2']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R3']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R4']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R5']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R6']||''}</td>
-          <td style="padding:7px 8px">${r.f.servicio||'Almuerzo Operativo'}</td>
-          <td style="padding:7px 8px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
-          <td style="padding:7px 8px;text-align:right">${fmt(r.sub)}</td>
-          <td style="padding:7px 8px;text-align:right">${fmt(r.iva)}</td>
-          <td style="padding:7px 8px;text-align:right;font-weight:700">${fmt(r.tot)}</td>
-        </tr>`).join('')}
-      </tbody>
-      <tfoot>
-        <tr style="background:#0f1c3f;color:white;font-weight:700">
-          <td colspan="14" style="padding:8px 10px;text-align:right">TOTALES</td>
-          <td style="padding:8px;text-align:right">${fmt(totales.sub)}</td>
-          <td style="padding:8px;text-align:right">${fmt(totales.iva)}</td>
-          <td style="padding:8px;text-align:right">${fmt(totales.tot)}</td>
-        </tr>
-      </tfoot>
-    </table>
-    <div style="margin-top:30px;padding-top:12px;border-top:1px solid #e2e6ed;text-align:center;font-size:10px;color:#6b7694">
-      <div style="height:3px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);margin-bottom:8px;border-radius:2px"></div>
-      Elaborado por: <strong>Ing. Carlos Velástegui</strong> · Administrador · Hanaska · ${hoy}
-    </div>
-  </div>`;
-
+  var thColsPDF = '<th style="padding:7px 8px;text-align:left">Razón Social</th><th style="padding:7px 8px;text-align:left">RUC</th><th style="padding:7px 8px;text-align:left">Dirección</th><th style="padding:7px 6px;text-align:left">Teléfono</th><th style="padding:7px 6px;text-align:left">Correo</th><th style="padding:7px 6px;text-align:center">Cant.</th><th style="padding:7px 4px;text-align:center">R1</th><th style="padding:7px 4px;text-align:center">R2</th><th style="padding:7px 4px;text-align:center">R3</th><th style="padding:7px 4px;text-align:center">R4</th><th style="padding:7px 4px;text-align:center">R5</th><th style="padding:7px 4px;text-align:center">R6</th><th style="padding:7px 8px;text-align:left">Servicio</th><th style="padding:7px 8px;text-align:right">P. Neto</th><th style="padding:7px 8px;text-align:right">Subtotal</th><th style="padding:7px 8px;text-align:right">IVA 15%</th><th style="padding:7px 8px;text-align:right">Total</th>';
+  var filasPDF = filas.map(function(r,i){ return '<tr style="background:'+(i%2===0?'white':'#f0f6fe')+';border-bottom:1px solid #e2e6ed"><td style="padding:7px 8px;font-weight:600">'+r.f.cliente+'</td><td style="padding:7px 8px;color:#555">'+(r.cli.ruc||'—')+'</td><td style="padding:7px 8px;color:#555">'+(r.cli.dir||'—')+'</td><td style="padding:7px 6px;color:#555">'+(r.cli.tel||'—')+'</td><td style="padding:7px 6px;color:#555">'+(r.cli.correo||'—')+'</td><td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">'+r.f.qty+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R1']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R2']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R3']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R4']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R5']||'')+'</td><td style="padding:7px 4px;text-align:center">'+(r.porFinca['R6']||'')+'</td><td style="padding:7px 8px">'+(r.f.servicio||'Almuerzo Operativo')+'</td><td style="padding:7px 8px;text-align:right">$'+r.precioU.toFixed(4).replace('.',',')+'</td><td style="padding:7px 8px;text-align:right">'+fmt(r.sub)+'</td><td style="padding:7px 8px;text-align:right">'+fmt(r.iva)+'</td><td style="padding:7px 8px;text-align:right;font-weight:700">'+fmt(r.tot)+'</td></tr>'; }).join('');
+  area.innerHTML = '<div style="padding:28px;max-width:1100px;margin:0 auto;font-family:Inter,sans-serif;font-size:11px"><div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:14px;border-bottom:2px solid #0f1c3f"><div><div style="font-size:18px;font-weight:700;color:#0f1c3f">HANASKA · Rosaprima</div><div style="height:4px;width:140px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);border-radius:2px;margin-top:6px"></div></div><div style="text-align:right"><div style="font-size:15px;font-weight:700;color:#185FA5">PEDIDO DE FACTURACIÓN</div><div style="font-size:11px;color:#6b7694;margin-top:4px">Fecha: '+hoy+'</div></div></div><table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr style="background:#0f1c3f;color:white">'+thColsPDF+'</tr></thead><tbody>'+filasPDF+'</tbody><tfoot><tr style="background:#0f1c3f;color:white;font-weight:700"><td colspan="14" style="padding:8px 10px;text-align:right">TOTALES</td><td style="padding:8px;text-align:right">'+fmt(totales.sub)+'</td><td style="padding:8px;text-align:right">'+fmt(totales.iva)+'</td><td style="padding:8px;text-align:right">'+fmt(totales.tot)+'</td></tr></tfoot></table><div style="margin-top:30px;padding-top:12px;border-top:1px solid #e2e6ed;text-align:center;font-size:10px;color:#6b7694"><div style="height:3px;background:linear-gradient(90deg,#e63946,#f4a261,#2a9d8f,#185FA5);margin-bottom:8px;border-radius:2px"></div>Elaborado por: <strong>Ing. Carlos Velástegui</strong> · Administrador · Hanaska · '+hoy+'</div></div>';
   area.style.display = 'block';
   document.querySelectorAll('.app').forEach(e=>e.style.display='none');
   document.getElementById('modal-pedido-fact').classList.remove('open');
