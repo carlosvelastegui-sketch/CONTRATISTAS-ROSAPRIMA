@@ -559,7 +559,7 @@ let nextFactId = 76;
 // PF#53 en adelante = nuevas desde hoy
 // Los históricos (PF#1-51) no se muestran ni gestionan
 
-let nextPFid = 53; // PF#52 ya asignada a MAGU SOLUTION S.A.S.
+let nextPFid = 53; // Se recalcula dinámicamente al cargar datos
 let nextCONid = 352; // IDs de nuevos consumos empiezan en 352
 
 
@@ -725,9 +725,20 @@ async function cargarDatosCloud(){
         facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:fQty,fecha:fechaLimpia,servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:fSub,iva:fIva,total:fTotal,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:facturaLimpia,comprobante:comprobanteLimpio,estado:estado,fechaPago:f.fechaPago||''});
       }
     });
+    // Recalcular nextPFid y nextFactId desde IDs reales para evitar duplicados
+    if(prefacturas.length > 0){
+      const maxPFid = Math.max(...prefacturas.map(p=>parseInt(p.id)||0));
+      if(maxPFid >= nextPFid) nextPFid = maxPFid + 1;
+    }
+    if(facturas.length > 0){
+      const maxFid = Math.max(...facturas.map(f=>parseInt(f.id)||0));
+      if(maxFid >= nextFactId) nextFactId = maxFid + 1;
+    }
+    const nprefEl = document.getElementById('p-npref');
+    if(nprefEl) nprefEl.value = nextPFid;
     renderDash();
     renderControl();
-    console.log('✓ Datos cargados desde la nube.');
+    console.log('✓ Datos cargados. Próximo PF#:', nextPFid, '| Próxima Factura ID:', nextFactId);
   } catch(e) {
     console.error('Error cargando datos:', e);
   }
@@ -1087,14 +1098,52 @@ function abrirModalPago(id){
     +'<div><div style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Fecha</div><div>'+(x.fecha||"—")+'</div></div>'
     +'<div><div style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Total</div><div style="font-weight:700;color:#185FA5">'+fmt(x.total)+'</div></div>'
     +'</div>';
+  // Determinar si ya tiene pago y comprobante registrados
+  const yaPagado = x.valorPagado > 0 && x.comprobante;
+  const camposModal = ["mpago-factura","mpago-fecha","mpago-comprobante","mpago-valor","mpago-retencion","mpago-obs"];
+
   document.getElementById("mpago-factura").value=x.factura;
-  document.getElementById("mpago-fecha").value=new Date().toISOString().split("T")[0];
-  document.getElementById("mpago-comprobante").value=x.refPago||"";
-  document.getElementById("mpago-valor").value=parseNum(x.total).toFixed(2);
-  document.getElementById("mpago-retencion").value="0";
+  document.getElementById("mpago-fecha").value=x.fechaPago||new Date().toISOString().split("T")[0];
+  document.getElementById("mpago-comprobante").value=x.comprobante||x.refPago||"";
+  document.getElementById("mpago-valor").value=yaPagado?parseNum(x.valorPagado).toFixed(2):parseNum(x.total).toFixed(2);
+  document.getElementById("mpago-retencion").value=x.retencion||"0";
   document.getElementById("mpago-dif").value="0.00";
-  document.getElementById("mpago-obs").value="";
+  document.getElementById("mpago-obs").value=x.obs||"";
+
+  // Bloquear todos los campos si ya tiene pago y comprobante
+  camposModal.forEach(function(id){
+    const el = document.getElementById(id);
+    if(el){ el.readOnly = yaPagado; el.style.background = yaPagado?"#f0f4fa":""; el.style.color = yaPagado?"#6b7694":""; }
+  });
+
+  // Mostrar aviso si ya está registrado el pago
+  let avisoEl = document.getElementById("mpago-aviso-pagado");
+  if(!avisoEl){
+    avisoEl = document.createElement("div");
+    avisoEl.id = "mpago-aviso-pagado";
+    avisoEl.style.cssText = "background:#e8f5e9;border:1px solid #4caf50;color:#1b5e20;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:12px;display:none";
+    avisoEl.innerHTML = "✅ Pago y comprobante ya registrados. Solo puedes ingresar el N° de Factura para cerrar.";
+    document.getElementById("mpago-resumen").insertAdjacentElement("afterend", avisoEl);
+  }
+  avisoEl.style.display = yaPagado ? "block" : "none";
+
+  // Si ya hay pago, solo dejar editable el campo de N° Factura (si aún no tiene)
+  if(yaPagado){
+    const fEl = document.getElementById("mpago-factura");
+    const tieneFact = x.factura && x.factura.trim() !== "";
+    fEl.readOnly = tieneFact;
+    fEl.style.background = tieneFact?"#f0f4fa":"#fff";
+    fEl.style.color = tieneFact?"#6b7694":"#1a1d2e";
+    if(tieneFact){
+      avisoEl.innerHTML = "✅ Factura, pago y comprobante ya registrados. Esta prefactura está cerrada.";
+    }
+  }
+
+  const btnGuardar = document.querySelector("#modal-pago .btn-success");
+  if(btnGuardar){ btnGuardar.style.display = (yaPagado && x.factura && x.factura.trim()!=="") ? "none" : ""; }
+
   function calcDif(){
+    if(yaPagado) return;
     const v=parseFloat(document.getElementById("mpago-valor").value)||0;
     const r=parseFloat(document.getElementById("mpago-retencion").value)||0;
     const dif=parseFloat((v+r-parseNum(x.total)).toFixed(4));
