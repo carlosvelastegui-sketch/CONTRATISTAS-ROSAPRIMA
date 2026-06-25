@@ -1066,6 +1066,7 @@ function renderControl(){
   else if(f) data = data.filter(x=>x.estado===f);
   if(fCli) data = data.filter(x=>x.cliente===fCli);
   data = data.reverse();
+  try{
   document.getElementById("ctrl-table").innerHTML = data.map(function(x){
     const isPaid = x.estado === 'pagado';
     return '<tr>'
@@ -1085,6 +1086,7 @@ function renderControl(){
       +'<td>'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':'')+'</td>'
       +'</tr>';
   }).join("");
+  }catch(e){ console.error('renderControl ERROR:',e); }
 }
 
 let pagoId=null;
