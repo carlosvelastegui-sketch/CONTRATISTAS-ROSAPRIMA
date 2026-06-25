@@ -327,6 +327,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div style="overflow-x:auto">
             <table><thead><tr>
               <th>N° Factura</th>
+              <th>N° Prefactura</th>
               <th>Fecha</th>
               <th>Contratista</th>
               <th>Servicio</th>
@@ -559,7 +560,7 @@ let nextFactId = 76;
 // PF#53 en adelante = nuevas desde hoy
 // Los históricos (PF#1-51) no se muestran ni gestionan
 
-let nextPFid = 53; // PF#52 ya asignada a MAGU SOLUTION S.A.S.
+let nextPFid = 53; // Se recalcula dinámicamente al cargar datos
 let nextCONid = 352; // IDs de nuevos consumos empiezan en 352
 
 
@@ -725,9 +726,12 @@ async function cargarDatosCloud(){
         facturas.push({id:fid||nextFactId++,cliente:f.cliente,qty:fQty,fecha:fechaLimpia,servicio:f.servicio||'Almuerzo Operativo',precioUnit:pu,subtotal:fSub,iva:fIva,total:fTotal,npref:f.npref||'',refPago:f.refPago||'',valorPagado:parseFloat(f.valorPagado)||0,retencion:parseFloat(f.retencion)||0,factura:facturaLimpia,comprobante:comprobanteLimpio,estado:estado,fechaPago:f.fechaPago||''});
       }
     });
+    if(prefacturas.length>0){const maxPFid=Math.max(...prefacturas.map(p=>parseInt(p.id)||0));if(maxPFid>=nextPFid)nextPFid=maxPFid+1;}
+    if(facturas.length>0){const maxFid=Math.max(...facturas.map(f=>parseInt(f.id)||0));if(maxFid>=nextFactId)nextFactId=maxFid+1;}
+    const nprefEl=document.getElementById('p-npref');if(nprefEl)nprefEl.value=nextPFid;
     renderDash();
     renderControl();
-    console.log('✓ Datos cargados desde la nube.');
+    console.log('✓ Datos cargados. Próximo PF#:', nextPFid, '| Próxima Factura ID:', nextFactId);
   } catch(e) {
     console.error('Error cargando datos:', e);
   }
@@ -1059,6 +1063,7 @@ function renderControl(){
     const isPaid = x.estado === 'pagado';
     return '<tr>'
       +'<td style="font-weight:700;color:#185FA5;font-size:12px">'+x.factura+'</td>'
+      +'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span>'+(parseInt(x.npref||0)>=52?' <button class="btn btn-pdf btn-sm" style="padding:2px 8px;font-size:11px" onclick="reimprimirPF('+x.id+')"><i class="ti ti-file-type-pdf"></i> PDF</button>':'')+' </td>'
       +'<td style="font-size:11px;color:#6b7694">'+( x.fecha||"—")+'</td>'
       +'<td style="font-size:12px">'+sh(x.cliente,18)+'</td>'
       +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
@@ -1087,14 +1092,40 @@ function abrirModalPago(id){
     +'<div><div style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Fecha</div><div>'+(x.fecha||"—")+'</div></div>'
     +'<div><div style="font-size:10px;color:#6b7694;text-transform:uppercase;font-weight:600">Total</div><div style="font-weight:700;color:#185FA5">'+fmt(x.total)+'</div></div>'
     +'</div>';
+  const yaPagado = x.valorPagado > 0 && x.comprobante;
+  const camposModal = ["mpago-factura","mpago-fecha","mpago-comprobante","mpago-valor","mpago-retencion","mpago-obs"];
   document.getElementById("mpago-factura").value=x.factura;
-  document.getElementById("mpago-fecha").value=new Date().toISOString().split("T")[0];
-  document.getElementById("mpago-comprobante").value=x.refPago||"";
-  document.getElementById("mpago-valor").value=parseNum(x.total).toFixed(2);
-  document.getElementById("mpago-retencion").value="0";
+  document.getElementById("mpago-fecha").value=x.fechaPago||new Date().toISOString().split("T")[0];
+  document.getElementById("mpago-comprobante").value=x.comprobante||"";
+  document.getElementById("mpago-valor").value=yaPagado?parseNum(x.valorPagado).toFixed(2):parseNum(x.total).toFixed(2);
+  document.getElementById("mpago-retencion").value=x.retencion||"0";
   document.getElementById("mpago-dif").value="0.00";
-  document.getElementById("mpago-obs").value="";
+  document.getElementById("mpago-obs").value=x.obs||"";
+  camposModal.forEach(function(id){
+    const el=document.getElementById(id);
+    if(el){el.readOnly=yaPagado;el.style.background=yaPagado?"#f0f4fa":"";el.style.color=yaPagado?"#6b7694":"";}
+  });
+  let avisoEl=document.getElementById("mpago-aviso-pagado");
+  if(!avisoEl){
+    avisoEl=document.createElement("div");
+    avisoEl.id="mpago-aviso-pagado";
+    avisoEl.style.cssText="background:#e8f5e9;border:1px solid #4caf50;color:#1b5e20;border-radius:8px;padding:10px 14px;font-size:13px;font-weight:600;margin-bottom:12px;display:none";
+    avisoEl.innerHTML="Pago y comprobante ya registrados. Solo puedes ingresar el N° de Factura para cerrar.";
+    document.getElementById("mpago-resumen").insertAdjacentElement("afterend",avisoEl);
+  }
+  avisoEl.style.display=yaPagado?"block":"none";
+  if(yaPagado){
+    const fEl=document.getElementById("mpago-factura");
+    const tieneFact=x.factura&&x.factura.trim()!=="";
+    fEl.readOnly=tieneFact;
+    fEl.style.background=tieneFact?"#f0f4fa":"#fff";
+    fEl.style.color=tieneFact?"#6b7694":"#1a1d2e";
+    if(tieneFact) avisoEl.innerHTML="Factura, pago y comprobante ya registrados. Esta prefactura está cerrada.";
+  }
+  const btnGuardar=document.querySelector("#modal-pago .btn-success");
+  if(btnGuardar) btnGuardar.style.display=(yaPagado&&x.factura&&x.factura.trim()!=="")?"none":"";
   function calcDif(){
+    if(yaPagado) return;
     const v=parseFloat(document.getElementById("mpago-valor").value)||0;
     const r=parseFloat(document.getElementById("mpago-retencion").value)||0;
     const dif=parseFloat((v+r-parseNum(x.total)).toFixed(4));
@@ -1122,7 +1153,18 @@ function guardarPago(){
     x.estado="pendiente_pago";
     alert("⚠ Los datos fueron guardados pero la prefactura permanece PENDIENTE hasta que ingrese el N° de factura emitida.");
   }
-  apiPost({action:'updateFactura',id:x.id,refPago:x.refPago,valorPagado:x.valorPagado,retencion:x.retencion,factura:x.factura,comprobante:x.comprobante,estado:x.estado,fechaPago:x.fechaPago});
+  apiPost({
+    action:'updateFactura',
+    id:x.id,
+    npref:x.npref,
+    factura:x.factura,
+    valorPagado:x.valorPagado,
+    retencion:x.retencion,
+    comprobante:x.comprobante,
+    estado:x.estado,
+    fechaPago:x.fechaPago,
+    refPago:''
+  });
   guardarLocalStorage();
   document.getElementById("modal-pago").classList.remove("open");
   renderControl();
@@ -1130,6 +1172,23 @@ function guardarPago(){
 }
 
 // Called when a new prefactura is confirmed - adds to facturas list as pending payment
+function reimprimirPF(facturaId){
+  const f=facturas.find(x=>x.id===facturaId);
+  if(!f){alert('No se encontró la prefactura.');return;}
+  const cl=clientes.find(c=>c.nombre===f.cliente)||{};
+  const pf={id:f.npref||f.id,cliente:f.cliente,qty:f.qty,servicio:f.servicio||'Almuerzo Operativo',precioUnit:f.precioUnit||1.7217,sub:f.subtotal||(f.qty*(f.precioUnit||1.7217)),iva:f.iva||((f.subtotal||0)*0.15),total:f.total,fecha:f.fecha||''};
+  if(!pf.sub||pf.sub===0){pf.sub=parseFloat((pf.qty*pf.precioUnit).toFixed(4));pf.iva=parseFloat((pf.sub*0.15).toFixed(4));pf.total=parseFloat((pf.sub+pf.iva).toFixed(4));}
+  const pfNum=String(pf.id).padStart(5,'0');
+  const css='<style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;margin:0;padding:0}body{font-family:Inter,sans-serif;font-size:12px;background:white;padding:10mm}table{width:100%;border-collapse:collapse;margin-bottom:12px}th{padding:8px 12px;background:#0f1c3f;color:white;text-align:left}td{padding:10px 12px;border-bottom:1px solid #f0f2f5}</style>';
+  const winHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PF-'+pfNum+'</title>'+css+'</head><body>'+generarHTMLPF(pf,cl)+'</body></html>';
+  const win=window.open('','_blank');
+  win.document.write(winHtml);
+  win.document.close();
+  win.focus();
+  win.onload=function(){setTimeout(function(){win.print();},400);};
+  setTimeout(function(){if(!win.closed){win.print();}},1800);
+}
+
 function agregarFacturaPendiente(pf){
   // Evitar duplicados: no agregar si ya existe una factura con el mismo npref Y qty
   if(facturas.find(f=>String(f.npref)===String(pf.id) && parseInt(f.qty)===parseInt(pf.qty))) return;
@@ -1418,7 +1477,7 @@ function renderCuentas(){
     const pct=Math.min(100,Math.max(0,Math.round((con/(con+Math.max(saldo,0)||1))*100)));
     const histP=allPFs.slice(-5).reverse();
     const histC=allCons.slice(-8).reverse();
-    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+(saldo>20?"badge-ok":saldo>0?"badge-pending":"badge-red")+'">'+saldo+' alm. disponibles</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7694;margin-bottom:6px"><span>Saldo actual: <strong>'+saldo+'</strong> alm.</span><span>'+pct+'% consumido</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldo>20?"#3B6D11":saldo>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th></tr></thead><tbody>'+histP.map(p=>'<tr><td style="padding:5px 8px;font-weight:600;color:#3B6D11">+'+p.qty+'</td><td style="padding:5px 8px;color:#6b7694">'+p.fecha+'</td><td style="padding:5px 8px"><span class="badge '+(p.factura?"badge-ok":"badge-pending")+'" style="font-size:10px">'+(p.factura?"OK":"Pend.")+'</span></td></tr>').join("")+'</tbody></table></div><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimos consumos</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Finca</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th></tr></thead><tbody>'+(histC.length?histC.map(x=>'<tr><td style="padding:5px 8px;color:#6b7694">'+x.fecha+'</td><td style="padding:5px 8px">'+fb(x.finca||"R1")+'</td><td style="padding:5px 8px;font-weight:600;color:#A32D2D">-'+x.qty+'</td></tr>').join(""):'<tr><td colspan="3" style="padding:10px 8px;color:#6b7694;text-align:center">Sin consumos</td></tr>')+'</tbody></table></div></div></div>';
+    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+(saldo>20?"badge-ok":saldo>0?"badge-pending":"badge-red")+'">'+saldo+' alm. disponibles</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7694;margin-bottom:6px"><span>Saldo actual: <strong>'+saldo+'</strong> alm.</span><span>'+pct+'% consumido</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldo>20?"#3B6D11":saldo>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th></tr></thead><tbody>'+histP.map(function(p){const ok=facturas.some(function(f){return String(f.npref)===String(p.id)&&f.factura&&f.factura.trim()!==''&&f.estado==='pagado';})||(p.estado==='pagado');return '<tr><td style="padding:5px 8px;font-weight:600;color:#3B6D11">+'+p.qty+'</td><td style="padding:5px 8px;color:#6b7694">'+p.fecha.toString().slice(0,10)+'</td><td style="padding:5px 8px"><span class="badge '+(ok?"badge-ok":"badge-pending")+'" style="font-size:10px">'+(ok?"Pagado":"Pend.")+'</span></td></tr>'; }).join("")+'</tbody></table></div><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimos consumos</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Finca</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th></tr></thead><tbody>'+(histC.length?histC.map(x=>'<tr><td style="padding:5px 8px;color:#6b7694">'+x.fecha+'</td><td style="padding:5px 8px">'+fb(x.finca||"R1")+'</td><td style="padding:5px 8px;font-weight:600;color:#A32D2D">-'+x.qty+'</td></tr>').join(""):'<tr><td colspan="3" style="padding:10px 8px;color:#6b7694;text-align:center">Sin consumos</td></tr>')+'</tbody></table></div></div></div>';
   }).join("");
 }
 
