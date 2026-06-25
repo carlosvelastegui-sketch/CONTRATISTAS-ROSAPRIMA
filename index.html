@@ -792,6 +792,22 @@ function mostrarSaldo(){
   document.getElementById("saldo-lbl").textContent=s>0?"Almuerzos disponibles":"Sin saldo — requiere nueva prefactura";
   document.getElementById("saldo-sub").textContent="Acreditados: "+acr+"  ·  Consumidos: "+con;
   d.style.display="";
+  // Bloquear registro si saldo es 0
+  const sinSaldo = s <= 0;
+  document.getElementById("lineas-consumo").style.display = sinSaldo ? "none" : "";
+  document.querySelector(".btn-add-linea").style.display = sinSaldo ? "none" : "";
+  const btnReg = document.getElementById("btn-registrar-consumo");
+  if(btnReg){ btnReg.disabled = sinSaldo; btnReg.style.opacity = sinSaldo ? "0.4" : "1"; }
+  // Mostrar/ocultar mensaje de saldo agotado
+  let msgSaldo = document.getElementById("msg-saldo-agotado");
+  if(!msgSaldo){
+    msgSaldo = document.createElement("div");
+    msgSaldo.id = "msg-saldo-agotado";
+    msgSaldo.style.cssText = "background:#FCEBEB;border:1px solid #e57373;color:#A32D2D;border-radius:8px;padding:12px 16px;font-size:13px;font-weight:600;margin-bottom:12px;text-align:center";
+    msgSaldo.innerHTML = "🚫 Saldo agotado — ingrese una nueva prefactura para continuar registrando consumos.";
+    document.getElementById("lineas-consumo").insertAdjacentElement("beforebegin", msgSaldo);
+  }
+  msgSaldo.style.display = sinSaldo ? "block" : "none";
   recalcCons();
 }
 
