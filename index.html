@@ -659,7 +659,7 @@ async function cargarDatosCloud(){
     clientes.length = 0;
     // Cargar clientes desde el Sheet
     if(Array.isArray(clis)) clis.forEach(x=>{
-      if(x.nombre) clientes.push({nombre:String(x.nombre).trim(),ruc:x.ruc||'',tel:x.tel||'',correo:x.correo||'',dir:x.dir||''});
+      if(x.nombre) clientes.push({id:x.id||'',nombre:String(x.nombre).trim(),ruc:x.ruc||'',tel:x.tel||'',correo:x.correo||'',dir:x.dir||''});
     });
 
     // Solo cargar registros NUEVOS (creados desde la app, no históricos del Excel)
