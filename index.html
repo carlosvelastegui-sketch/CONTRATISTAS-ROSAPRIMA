@@ -1464,9 +1464,9 @@ function descargarPedidoExcel(){
   totRow.eachCell({includeEmpty:true},(cell,colNum)=>{cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:9,bold:true,color:{argb:'FF'+BLANCO}};cell.border=mkBorder(AZUL_DARK);});
   ws.getCell('A'+(lastRow+1)).value='TOTALES';
   ws.getCell('A'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
-  ws.getCell('O'+(lastRow+1)).value=totales.sub; ws.getCell('O'+(lastRow+1)).numFmt='#,##0.0000'; ws.getCell('O'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
-  ws.getCell('P'+(lastRow+1)).value=totales.iva; ws.getCell('P'+(lastRow+1)).numFmt='#,##0.0000'; ws.getCell('P'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
-  ws.getCell('Q'+(lastRow+1)).value=totales.tot; ws.getCell('Q'+(lastRow+1)).numFmt='#,##0.0000'; ws.getCell('Q'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
+  ws.getCell('P'+(lastRow+1)).value=totales.sub; ws.getCell('p'+(lastRow+1)).numFmt='#,##0.0000'; ws.getCell('O'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
+  ws.getCell('Q'+(lastRow+1)).value=totales.iva; ws.getCell('q'+(lastRow+1)).numFmt='#,##0.0000'; ws.getCell('P'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
+   ws.getCell('R'+(lastRow+1)).value=totales.tot; ws.getCell('r'+(lastRow+1)).numFmt='#,##0.0000'; ws.getCell('Q'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
   // Separador inferior
   const rSep=ws.addRow([]); rSep.height=4;
   for(let i=1;i<=17;i++) rSep.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
