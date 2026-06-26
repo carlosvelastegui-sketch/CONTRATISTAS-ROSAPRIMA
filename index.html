@@ -1205,7 +1205,7 @@ function reimprimirPF(facturaId){
   win.document.close();
   win.focus();
   win.onload=function(){setTimeout(function(){win.print();},400);};
-  setTimeout(function(){if(!win.closed){win.print();}},1800);
+  
 }
 
 function agregarFacturaPendiente(pf){
