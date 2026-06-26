@@ -1460,7 +1460,7 @@ function descargarPedidoExcel(){
   // Fila totales
   const lastRow=7+filas.length;
   const totRow=ws.addRow([]); totRow.height=18;
-  ws.mergeCells('A'+(lastRow+1)+':N'+(lastRow+1));
+  ws.mergeCells('A'+(lastRow+1)+':O'+(lastRow+1));
   totRow.eachCell({includeEmpty:true},(cell,colNum)=>{cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:9,bold:true,color:{argb:'FF'+BLANCO}};cell.border=mkBorder(AZUL_DARK);});
   ws.getCell('A'+(lastRow+1)).value='TOTALES';
   ws.getCell('A'+(lastRow+1)).alignment={horizontal:'right',vertical:'middle'};
