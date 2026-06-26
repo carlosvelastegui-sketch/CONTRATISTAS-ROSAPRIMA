@@ -1861,7 +1861,8 @@ async function guardarCli(){
   if(editIdx>=0){
     clientes[editIdx]=c;
     try{
-      const r = await apiPost({action:'updateCliente',nombre:c.nombre,ruc:c.ruc,tel:c.tel,correo:c.correo,dir:c.dir});
+      const cliOriginal = clientes[editIdx];
+      const r = await apiPost({action:'updateCliente',id:cliOriginal.id||'',nombreOriginal:cliOriginal.nombre,nombre:c.nombre,ruc:c.ruc,tel:c.tel,correo:c.correo,dir:c.dir});
       console.log('updateCliente respuesta:', JSON.stringify(r));
       if(r && r.ok) alert('✅ Cliente actualizado correctamente en el Sheet');
       else alert('⚠️ Respuesta: ' + JSON.stringify(r));
