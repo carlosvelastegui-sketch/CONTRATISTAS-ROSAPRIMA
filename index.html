@@ -1860,10 +1860,20 @@ async function guardarCli(){
   const c={nombre:n,ruc:document.getElementById("mc-ruc").value,tel:document.getElementById("mc-tel").value,correo:document.getElementById("mc-correo").value,dir:document.getElementById("mc-dir").value};
   if(editIdx>=0){
     clientes[editIdx]=c;
-    try{ await apiPost({action:'updateCliente',nombre:c.nombre,ruc:c.ruc,tel:c.tel,correo:c.correo,dir:c.dir}); }catch(e){ console.error('Error actualizando cliente:',e); }
+    try{
+      const r = await apiPost({action:'updateCliente',nombre:c.nombre,ruc:c.ruc,tel:c.tel,correo:c.correo,dir:c.dir});
+      console.log('updateCliente respuesta:', JSON.stringify(r));
+      if(r && r.ok) alert('✅ Cliente actualizado correctamente en el Sheet');
+      else alert('⚠️ Respuesta: ' + JSON.stringify(r));
+    }catch(e){ console.error('Error actualizando cliente:',e); alert('Error: '+e); }
   } else {
     clientes.push(c);
-    try{ await apiPost({action:'saveCliente',nombre:c.nombre,ruc:c.ruc,tel:c.tel,correo:c.correo,dir:c.dir}); }catch(e){ console.error('Error guardando cliente:',e); }
+    try{
+      const r = await apiPost({action:'saveCliente',nombre:c.nombre,ruc:c.ruc,tel:c.tel,correo:c.correo,dir:c.dir});
+      console.log('saveCliente respuesta:', JSON.stringify(r));
+      if(r && r.ok) alert('✅ Cliente guardado correctamente en el Sheet');
+      else alert('⚠️ Respuesta: ' + JSON.stringify(r));
+    }catch(e){ console.error('Error guardando cliente:',e); alert('Error: '+e); }
   }
   cerrarModal(); poblar(); renderCli();
 }
