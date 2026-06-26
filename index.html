@@ -1419,6 +1419,7 @@ function descargarPedidoExcel(){
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub,iva:a.iva+r.iva,tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Pedido Facturación');
+  ws.views = [{showGridLines: false}];
   ws.columns = [{width:24},{width:14},{width:14},{width:13},{width:22},{width:7},{width:6},{width:6},{width:6},{width:6},{width:6},{width:6},{width:20},{width:16},{width:10},{width:11},{width:10},{width:11}];
   const AZUL_DARK='0F1C3F',AZUL_MED='185FA5',AZUL_LIGHT='E6F1FB',BLANCO='FFFFFF',GRIS_T='6B7694';
   const mkBorder=color=>({top:{style:'thin',color:{argb:'FF'+color}},bottom:{style:'thin',color:{argb:'FF'+color}},left:{style:'thin',color:{argb:'FF'+color}},right:{style:'thin',color:{argb:'FF'+color}}});
@@ -1471,10 +1472,10 @@ totRow.eachCell({includeEmpty:true},(cell,colNum)=>{
   cell.alignment={horizontal:'right',vertical:'middle'};
 });  // Separador inferior
   const rSep=ws.addRow([]); rSep.height=4;
-  for(let i=1;i<=17;i++) rSep.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
+  for(let i=1;i<=18;i++) rSep.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
   // Pie
   const rPie=ws.addRow(['TECFOOD SERVICIOS DE ALIMENTACION S.A.  |  RUC: 1792065461001  |  Cayambe, Pichincha']); rPie.height=14;
-  ws.mergeCells('A'+(lastRow+3)+':Q'+(lastRow+3));
+  ws.mergeCells('A'+(lastRow+3)+':R'+(lastRow+3));
   rPie.getCell(1).font={name:'Arial',size:8,italic:true,color:{argb:'FF'+GRIS_T}};
   rPie.getCell(1).alignment={horizontal:'center',vertical:'middle'};
   wb.xlsx.writeBuffer().then(buffer=>{
