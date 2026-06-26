@@ -1251,6 +1251,8 @@ function getPrecioPF(servicio, precioUnitRaw){
 
 function calcFilaPF(f){
   const cli  = clientes.find(c=>c.nombre===f.cliente)||{};
+  // Asegurar que RUC se muestre como texto sin notación científica
+  if(cli.ruc) cli.ruc = String(cli.ruc).replace(/\.0+$/, '').split('e')[0].split('E')[0];
   const precioU = getPrecioPF(f.servicio, f.precioUnit);
   // PF-55 excepcion: consumos confirmados 36 R1 + 4 R3 + 2 R6 = 42
   // PF-56 excepcion: consumos confirmados Hanaska 21-abr al 23-jun = 138
@@ -1360,6 +1362,7 @@ function generarPedido(){
           <th style="padding:8px 6px;text-align:center">R5</th>
           <th style="padding:8px 6px;text-align:center">R6</th>
           <th style="padding:8px 10px;text-align:left">Servicio</th>
+          <th style="padding:8px 10px;text-align:left">N° Comprobante</th>
           <th style="padding:8px 10px;text-align:right">P. Neto</th>
           <th style="padding:8px 10px;text-align:right">Subtotal</th>
           <th style="padding:8px 10px;text-align:right">IVA 15%</th>
@@ -1370,7 +1373,7 @@ function generarPedido(){
         ${filas.map((r,i)=>`
         <tr style="border-bottom:1px solid #e2e6ed;background:${i%2===0?'white':'#f8f9fb'}">
           <td style="padding:8px 10px;font-weight:600">${r.f.cliente}</td>
-          <td style="padding:8px 10px;color:#6b7694">${r.cli.ruc||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.cli.ruc?String(r.cli.ruc).replace(/[eE].*$/,'').replace(/\.0+$/,''):'—'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.cli.dir||'—'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.cli.tel||'—'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.cli.correo||'—'}</td>
@@ -1382,6 +1385,7 @@ function generarPedido(){
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R5']||''}</td>
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${r.f.comprobante||'—'}</td>
           <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
@@ -1390,7 +1394,7 @@ function generarPedido(){
       </tbody>
       <tfoot>
         <tr style="background:#0f1c3f;color:white;font-weight:700">
-          <td colspan="14" style="padding:10px 12px;text-align:right">TOTALES</td>
+          <td colspan="15" style="padding:10px 12px;text-align:right">TOTALES</td>
           <td style="padding:10px;text-align:right">${fmt(totales.sub)}</td>
           <td style="padding:10px;text-align:right">${fmt(totales.iva)}</td>
           <td style="padding:10px;text-align:right">${fmt(totales.tot)}</td>
@@ -1411,7 +1415,7 @@ function descargarPedidoExcel(){
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub,iva:a.iva+r.iva,tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Pedido Facturación');
-  ws.columns = [{width:24},{width:14},{width:14},{width:13},{width:22},{width:7},{width:6},{width:6},{width:6},{width:6},{width:6},{width:6},{width:20},{width:10},{width:11},{width:10},{width:11}];
+  ws.columns = [{width:24},{width:14},{width:14},{width:13},{width:22},{width:7},{width:6},{width:6},{width:6},{width:6},{width:6},{width:6},{width:20},{width:16},{width:10},{width:11},{width:10},{width:11}];
   const AZUL_DARK='0F1C3F',AZUL_MED='185FA5',AZUL_LIGHT='E6F1FB',BLANCO='FFFFFF',GRIS_T='6B7694';
   const mkBorder=color=>({top:{style:'thin',color:{argb:'FF'+color}},bottom:{style:'thin',color:{argb:'FF'+color}},left:{style:'thin',color:{argb:'FF'+color}},right:{style:'thin',color:{argb:'FF'+color}}});
   // Fila 1 espaciado
