@@ -1440,14 +1440,14 @@ function descargarPedidoExcel(){
   // Fila 6 espaciado
   ws.addRow([]); ws.getRow(6).height=6;
   // Fila 7 headers
-  const hdrs=['Razón Social','RUC','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','P. Neto','Subtotal','IVA 15%','Total'];
+ const hdrs=['Razón Social','RUC','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','Nº Comprobante','P. Neto','Subtotal','IVA 15%','Total'];
   const r7=ws.addRow(hdrs); r7.height=22;
   r7.eachCell(cell=>{cell.font={name:'Arial',size:9,bold:true,color:{argb:'FF'+BLANCO}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};cell.border=mkBorder('0D4E8A');});
   ws.getRow(7).getCell(1).alignment={horizontal:'left',vertical:'middle'};
   // Filas datos
-  const numCols=new Set([6,7,8,9,10,11,12,14,15,16,17]);
+  const numCols=new Set([6,7,8,9,10,11,12,15,16,17,18]);
   filas.forEach(r=>{
-    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.f.qty,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.precioU,r.sub,r.iva,r.tot]);
+    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.f.qty,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',r.precioU,r.sub,r.iva,r.tot]);
     row.height=18;
     row.eachCell({includeEmpty:true},(cell,colNum)=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_LIGHT}};
