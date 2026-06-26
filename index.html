@@ -1269,6 +1269,8 @@ function calcFilaPF(f){
     porFinca = {'R2': 4};
   } else if(String(f.npref) === '60'){
     porFinca = {'R2': 3};
+  } else if(String(f.npref) === '61'){
+    porFinca = {'R3': 162};
   } else {
     porFinca = getFincaBreakdown(f.cliente, f.fecha, f.qty);
   }
@@ -1314,7 +1316,7 @@ function generarPedido(){
   // Validar que consumos reales cuadren con lo prepagado
   const errores = [];
   selected.forEach(function(f){
-    if(['55','56','57','58','59','60'].includes(String(f.npref))) return;
+    if(['55','56','57','58','59','60','61'].includes(String(f.npref))) return;
     const porFinca = getFincaBreakdown(f.cliente, f.fecha, f.qty);
     const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0);
     if(totalReal < f.qty){
@@ -1403,7 +1405,7 @@ function generarPedido(){
 
 function descargarPedidoExcel(){
   const selected = getSeleccionadas(); if(!selected) return;
-  const err2=[];selected.forEach(function(f){if(['55','56','57','58','59','60'].includes(String(f.npref))) return;const pf2=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
+  const err2=[];selected.forEach(function(f){if(['55','56','57','58','59','60','61'].includes(String(f.npref))) return;const pf2=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub,iva:a.iva+r.iva,tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
