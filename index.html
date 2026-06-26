@@ -1885,7 +1885,7 @@ poblar(); calcPF(); agregarLinea();
 cargarLocalStorage();
 showTab('dashboard', document.querySelector('.nav-item'));
 renderDash();
-cargarDatosCloud().then(function(){ renderDash(); renderControl(); });
+cargarDatosCloud().then(function(){ poblar(); renderDash(); renderControl(); });
 </script>
 </body>
 </html>
