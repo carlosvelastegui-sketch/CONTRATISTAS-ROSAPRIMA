@@ -1080,16 +1080,13 @@ function renderControl(){
 +'<td class="num">'+x.qty+'</td>'
 +'<td class="num">'+fmt(x.total)+'</td>'
 +'<td style="font-size:11px;color:#6b7694">'+(x.refPago||"-")+'</td>'
-+'<td class="num">'+(isPaid?fmt(x.valorPagado):"-")+'</td>'
++'<td class="num">'+(x.valorPagado?fmt(x.valorPagado):"-")+'</td>'
 +'<td class="num">'+(x.retencion?fmt(x.retencion):"-")+'</td>'
 +'<td style="font-size:11px;color:#6b7694">'+(x.comprobante||"-")+'</td>'
 +'<td>'+(isPaid
   ?'<span class="badge badge-ok">Pagado</span>'
   :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
-+'<td style="display:flex;gap:6px">'
-+(isPaid
-  ?'<button class="btn btn-sm" onclick="reimprimirPF('+x.id+')"><i class="ti ti-printer"></i></button>'
-  :'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')
++'<td>'+(isPaid?'':'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')+'</td>'
 +'</td>'+'</tr>';
   }).join("");
 }
