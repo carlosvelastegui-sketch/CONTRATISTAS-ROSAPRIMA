@@ -1089,10 +1089,8 @@ function renderControl(){
 +'<td style="display:flex;gap:6px">'
 +(isPaid
   ?'<button class="btn btn-sm" onclick="reimprimirPF('+x.id+')"><i class="ti ti-printer"></i></button>'
-  :'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>'
-  +' <button class="btn btn-sm" onclick="reimprimirPF('+x.id+')"><i class="ti ti-printer"></i></button>')
-+'</td>'
-+'</tr>';
+  :'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')
++'</td>'+'</tr>';
   }).join("");
 }
 
