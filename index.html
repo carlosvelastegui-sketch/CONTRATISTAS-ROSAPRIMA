@@ -1427,7 +1427,7 @@ function descargarPedidoExcel(){
   // Fila 2 título
   const r2=ws.addRow(['HANASKA (Rosaprima)  —  PEDIDO DE FACTURACIÓN']); r2.height=28;
   ws.mergeCells('A2:Q2');
-  for(let i=1;i<=17;i++){const cell=r2.getCell(i);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:14,bold:true,color:{argb:'FF'+BLANCO}};if(i===1)cell.alignment={horizontal:'left',vertical:'middle'};}
+  for(let i=1;i<=18;i++){const cell=r2.getCell(i);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:14,bold:true,color:{argb:'FF'+BLANCO}};if(i===1)cell.alignment={horizontal:'left',vertical:'middle'};}
   // Fila 3 espaciado
   ws.addRow([]); ws.getRow(3).height=6;
   // Fila 4 fecha
@@ -1437,7 +1437,7 @@ function descargarPedidoExcel(){
   ws.getCell('B4').font={name:'Arial',size:10,color:{argb:'FF1A1A2E'}};
   // Fila 5 separador
   const r5=ws.addRow([]); r5.height=4;
-  for(let i=1;i<=17;i++) r5.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
+  for(let i=1;i<=18;i++) r5.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
   // Fila 6 espaciado
   ws.addRow([]); ws.getRow(6).height=6;
   // Fila 7 headers
