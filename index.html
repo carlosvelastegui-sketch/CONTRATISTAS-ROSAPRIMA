@@ -1202,10 +1202,8 @@ function reimprimirPF(facturaId){
   const winHtml='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PF-'+pfNum+'</title>'+css+'</head><body>'+generarHTMLPF(pf,cl)+'</body></html>';
   const win=window.open('','_blank');
   win.document.write(winHtml);
-  win.document.close();
-  win.focus();
-  win.onload=function(){setTimeout(function(){win.print();},400);};
-  
+ win.document.close();
+setTimeout(function(){win.print();},600);
 }
 
 function agregarFacturaPendiente(pf){
