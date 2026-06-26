@@ -1072,22 +1072,22 @@ function renderControl(){
   document.getElementById("ctrl-table").innerHTML = data.map(function(x){
     const isPaid = x.estado === 'pagado';
     return '<tr>'
-      +'<td style="font-weight:700;color:#185FA5;font-size:12px">'+x.factura+'</td>'
-      +'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span>'+(parseInt(x.npref||0)>=52?' <button class="btn btn-pdf btn-sm" style="padding:2px 8px;font-size:11px" onclick="reimprimirPF('+x.id+')"><i class="ti ti-file-type-pdf"></i> PDF</button>':'')+' </td>'
-      +'<td style="font-size:11px;color:#6b7694">'+( x.fecha||"—")+'</td>'
-      +'<td style="font-size:12px">'+sh(x.cliente,18)+'</td>'
-      +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
-      +'<td class="num">'+x.qty+'</td>'
-      +'<td class="num">'+fmt(x.total)+'</td>'
-      +'<td style="font-size:11px;color:#6b7694">'+(x.refPago||"—")+'</td>'
-      +'<td class="num">'+(isPaid?fmt(x.valorPagado):"—")+'</td>'
-      +'<td class="num">'+(x.retencion?fmt(x.retencion):"—")+'</td>'
-      +'<td style="font-size:11px;color:#6b7694">'+(x.comprobante||"—")+'</td>'
-      +'<td>'+(isPaid
-        ?'<span class="badge badge-ok">Pagado</span>'
-        :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
-      +'<td>'+(!isPaid?'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>':"")+'</td>'
-      +'</tr>';
++'<td style="font-weight:700;color:#185FA5;font-size:12px">'+x.factura+'</td>'
++'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span>'+(parseInt(x.npref||0)>=52?'<button' : '')+'</td>'
++'<td style="font-size:11px;color:#6b7694">'+( x.fecha||"-")+'</td>'
++'<td style="font-size:12px">'+sh(x.cliente,18)+'</td>'
++'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
++'<td class="num">'+x.qty+'</td>'
++'<td class="num">'+fmt(x.total)+'</td>'
++'<td style="font-size:11px;color:#6b7694">'+(x.refPago||"-")+'</td>'
++'<td class="num">'+(isPaid?fmt(x.valorPagado):"-")+'</td>'
++'<td class="num">'+(x.retencion?fmt(x.retencion):"-")+'</td>'
++'<td style="font-size:11px;color:#6b7694">'+(x.comprobante||"-")+'</td>'
++'<td>'+(isPaid
+  ?'<span class="badge badge-ok">Pagado</span>'
+  :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
++'<td>'+(isPaid?'':'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')+'</td>'
++'</tr>';
   }).join("");
 }
 
