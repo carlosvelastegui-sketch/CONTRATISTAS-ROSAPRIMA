@@ -1446,7 +1446,7 @@ function descargarPedidoExcel(){
   // Filas datos
   const numCols=new Set([6,7,8,9,10,11,12,15,16,17,18]);
   filas.forEach(r=>{
-    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.f.qty,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',r.precioU,r.sub,r.iva,r.tot]);
+    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',r.precioU,r.sub,r.iva,r.tot]);
     row.height=18;
     row.eachCell({includeEmpty:true},(cell,colNum)=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_LIGHT}};
@@ -1533,7 +1533,7 @@ function descargarPedidoPDF(){
           <td style="padding:7px 8px;color:#555">${r.cli.dir||'—'}</td>
           <td style="padding:7px 6px;color:#555">${r.cli.tel||'—'}</td>
           <td style="padding:7px 6px;color:#555">${r.cli.correo||'—'}</td>
-          <td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">${r.f.qty}</td>
+          <td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">${r.totalReal}</td>
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R1']||''}</td>
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R2']||''}</td>
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R3']||''}</td>
