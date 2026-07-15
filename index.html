@@ -200,7 +200,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="form-row">
             <div class="form-group"><label>Contratista</label>
               <select id="c-cliente" onchange="mostrarSaldo()"><option value="">Seleccione...</option></select></div>
-            <div class="form-group"><label>Fecha</label><input type="date" id="c-fecha"></div>
+            <div class="form-group"><label>Fecha</label><input type="date" id="c-fecha" min="2024-01-01" max="2028-12-31"></div>
           </div>
           <div id="saldo-display" style="display:none">
             <div class="saldo-card" id="saldo-card">
@@ -255,7 +255,7 @@ tbody tr:hover td{background:#f8f9fb}
                   <option value="Refrigerio 2 Vianda">Refrigerio 2 Vianda — $0.3565</option>
                 </select>
               </div>
-              <div class="form-group"><label>Fecha</label><input type="date" id="p-fecha"></div>
+              <div class="form-group"><label>Fecha</label><input type="date" id="p-fecha" min="2024-01-01" max="2028-12-31"></div>
             </div>
             <div class="form-row">
               <div class="form-group"><label>Cantidad</label>
@@ -590,6 +590,42 @@ let nextFactId = 76;
 let nextPFid = 53; // Se recalcula dinámicamente al cargar datos
 let nextCONid = 352; // IDs de nuevos consumos empiezan en 352
 
+// Normaliza cualquier fecha que venga de Google Sheets a formato YYYY-MM-DD.
+// Google Apps Script a veces devuelve un objeto Date real (no texto) cuando
+// la celda está formateada como fecha; convertirlo con String()/.toString()
+// directamente da algo como "Mon Jul 13 2026 00:00:00 GMT-0500", lo cual
+// rompe cualquier comparación de fechas más adelante. Esta función cubre
+// los 3 casos: objeto Date, ISO (2026-07-13T...), y DD/MM/YYYY.
+function toISODate(v){
+  if(v===null||v===undefined||v==='') return '';
+  if(v instanceof Date && !isNaN(v)){
+    const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
+    return y+'-'+m+'-'+d;
+  }
+  const s=String(v);
+  if(s.includes('T')) return s.slice(0,10);
+  if(s.includes('/') && s.length===10){
+    const p=s.split('/');
+    return p[2]+'-'+p[1]+'-'+p[0];
+  }
+  return s.slice(0,10);
+}
+
+// Valida que una fecha (YYYY-MM-DD) tenga un año razonable, para atrapar
+// errores de tipeo (ej: 2023 en vez de 2026) o relojes de sistema mal
+// configurados, ANTES de guardar la prefactura/consumo. Devuelve true si
+// la fecha es aceptable (el usuario la confirmó o está en rango normal).
+function validarFechaRazonable(fechaStr, etiqueta){
+  if(!fechaStr) return true; // campo vacío: que lo maneje la validación de "campo requerido" de cada formulario
+  const anio = parseInt(String(fechaStr).slice(0,4));
+  const anioActual = new Date().getFullYear();
+  if(isNaN(anio)) return true;
+  if(Math.abs(anio - anioActual) > 1){
+    return confirm('⚠ La fecha de '+etiqueta+' que ingresaste es '+fechaStr+', con año '+anio+'.\n\nEsto parece un error de tipeo (el año actual es '+anioActual+').\n\n¿Estás SEGURO de que esta fecha es correcta? Presiona Cancelar para corregirla.');
+  }
+  return true;
+}
+
 
 
 
@@ -714,7 +750,7 @@ async function cargarDatosCloud(){
     // Solo cargar registros NUEVOS (creados desde la app, no históricos del Excel)
     if(Array.isArray(cons)) cons.forEach(x=>{
       if(parseInt(x.id) >= 352)
-        consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:(x.fecha||'').toString().slice(0,10),obs:x.obs||''});
+        consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:toISODate(x.fecha),obs:x.obs||''});
     });
     // Solo cargar prefacturas nuevas (PF#52 en adelante)
     if(Array.isArray(pfs)) pfs.forEach(p=>{
@@ -726,7 +762,7 @@ async function cargarDatosCloud(){
         if(!isNaN(pu) && pu > 100) pu = pu / 1000;
         if(isNaN(pu)||pu===0) pu=1.7217;
         if(pu>100) pu=pu/1000;
-        const estadoPF=(p.estado==='pendiente'||!p.estado)?'pendiente_pago':p.estado; prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:estadoPF,fecha:p.fecha||''});
+        const estadoPF=(p.estado==='pendiente'||!p.estado)?'pendiente_pago':p.estado; prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:estadoPF,fecha:toISODate(p.fecha)});
       }
     });
     // Cargar TODAS las facturas sin duplicar
@@ -766,7 +802,7 @@ async function cargarDatosCloud(){
           fTotal = parseFloat((fSub + fIva).toFixed(2));
         }
         // Limpiar fecha: eliminar parte de hora si viene como ISO (2026-06-18T05:00:00.000Z)
-        var fechaLimpia = (f.fecha||'').toString().slice(0,10);
+        var fechaLimpia = toISODate(f.fecha);
         // Limpiar comprobante: si contiene 'pendiente' o 'pagado' no es un comprobante real
         var comprobanteLimpio = String(f.comprobante||'');
         if(comprobanteLimpio.toLowerCase().includes('pendiente') || comprobanteLimpio.toLowerCase().includes('pagado')) comprobanteLimpio = '';
@@ -775,6 +811,7 @@ async function cargarDatosCloud(){
     });
     if(prefacturas.length>0){const maxPFid=Math.max(...prefacturas.map(p=>parseInt(p.id)||0));if(maxPFid>=nextPFid)nextPFid=maxPFid+1;}
     if(facturas.length>0){const maxFid=Math.max(...facturas.map(f=>parseInt(f.id)||0));if(maxFid>=nextFactId)nextFactId=maxFid+1;}
+    if(consumos.length>0){const maxConId=Math.max(...consumos.map(x=>parseInt(x.id)||0));if(maxConId>=nextCONid)nextCONid=maxConId+1;}
     const nprefEl=document.getElementById('p-npref');if(nprefEl)nprefEl.value=nextPFid;
     renderDash();
     renderControl();
@@ -904,10 +941,11 @@ async function registrarConsumo(){
   if(!n){alert("Selecciona un contratista");return;}
   const lineas=getLineas();
   if(!lineas.length){alert("Agrega al menos una finca");return;}
+  const fecha=document.getElementById("c-fecha").value;
+  if(!validarFechaRazonable(fecha, 'el consumo')) return;
   const total=lineas.reduce((a,l)=>a+l.qty,0);
   const saldo=getSaldo(n);
   if(total>saldo&&!confirm("⚠ Saldo insuficiente\nSaldo: "+saldo+" · Consumiendo: "+total+"\n\n¿Registrar de todas formas?")) return;
-  const fecha=document.getElementById("c-fecha").value;
   const obs=document.getElementById("c-obs").value;
 
   const btn = document.getElementById('btn-registrar-consumo');
@@ -977,6 +1015,7 @@ function irPS2(){
   const qty=parseInt(document.getElementById("p-qty").value)||0;
   if(!qty){alert("Ingresa la cantidad");return;}
   const fecha=document.getElementById("p-fecha").value;
+  if(!validarFechaRazonable(fecha, 'la prefactura')) return;
   const ref=document.getElementById("p-refpago").value;
   const servNombre=document.getElementById("p-servicio")?.value||"Almuerzo Operativo";
   const precioObj=PRECIOS_SERVICIOS[servNombre]||{neto:1.7217,iva:0.2583,total:1.98};
@@ -999,20 +1038,8 @@ function irPS2(){
 // forzaba todo a "R1", lo cual era incorrecto).
 function getFincaBreakdown(cliente, fechaHasta, qtyTotal){
   const todosC = consumosHistoricos.concat(consumos);
-  // Limpiar fechas con formato ISO (2026-06-01T05:00:00.000Z) a solo YYYY-MM-DD
-  const limpiarFecha = function(f){
-    if(!f) return '';
-    const s = String(f);
-    // Formato ISO: 2026-06-01T05:00:00.000Z
-    if(s.includes('T')) return s.slice(0,10);
-    // Formato DD/MM/YYYY: 18/06/2026
-    if(s.includes('/') && s.length===10){
-      const p=s.split('/');
-      return p[2]+'-'+p[1]+'-'+p[0];
-    }
-    // Formato YYYY-MM-DD: ya correcto
-    return s.slice(0,10);
-  };
+  // Usa la función global toISODate (maneja objetos Date, ISO y DD/MM/YYYY)
+  const limpiarFecha = toISODate;
   const fHasta = limpiarFecha(fechaHasta);
   const anteriores = facturas
     .filter(x=>x.cliente===cliente && x.fecha && limpiarFecha(x.fecha) < fHasta)
