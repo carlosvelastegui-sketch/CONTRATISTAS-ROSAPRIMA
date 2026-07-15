@@ -65,6 +65,7 @@ tbody tr:hover td{background:#f8f9fb}
 .badge-ok{background:#EAF3DE;color:#3B6D11}
 .badge-pending{background:#FAEEDA;color:#854F0B}
 .badge-red{background:#FCEBEB;color:#A32D2D}
+.badge-solicitado{background:#E6F1FB;color:#185FA5}
 .badge-info{background:#E6F1FB;color:#185FA5}
 .saldo-card{border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;border:1.5px solid}
 .saldo-ok{background:#EAF3DE;border-color:#C0DD97}
@@ -679,12 +680,13 @@ function apiPost(data){
 async function cargarDatosCloud(){
   console.log('Cargando datos de la nube...');
   try {
-    const [cons, pfs, facts, clis, notasP] = await Promise.all([
+    const [cons, pfs, facts, clis, notasP, solF] = await Promise.all([
       apiGet('getConsumos'),
       apiGet('getPrefacturas'),
       apiGet('getFacturas'),
       apiGet('getClientes'),
-      apiGet('getNotasPedido')
+      apiGet('getNotasPedido'),
+      apiGet('getSolicitudesFacturacion')
     ]);
     // Limpiar arrays antes de cargar desde la nube (evitar duplicados)
     consumos.length = 0;
@@ -692,6 +694,7 @@ async function cargarDatosCloud(){
     facturas.length = 0;
     clientes.length = 0;
     notasPedido.length = 0;
+    solicitudesFacturacion.clear();
     // Cargar clientes desde el Sheet
     if(Array.isArray(clis)) clis.forEach(x=>{
       if(x.nombre) clientes.push({id:x.id||'',nombre:String(x.nombre).trim(),ruc:x.ruc||'',tel:x.tel||'',correo:x.correo||'',dir:x.dir||''});
@@ -700,6 +703,11 @@ async function cargarDatosCloud(){
     if(Array.isArray(notasP)) notasP.forEach(n=>{
       if(n.id!==undefined && n.id!=='') notasPedido.push({id:n.id, facturaId:parseInt(n.facturaId)||n.facturaId, npref:n.npref||'', cliente:n.cliente||'', fecha:(n.fecha||'').toString().slice(0,10), nota:n.nota||''});
     });
+    // Cargar qué prefacturas ya fueron solicitadas en un pedido de facturación
+    if(Array.isArray(solF)) solF.forEach(s=>{
+      if(s.facturaId!==undefined && s.facturaId!=='') solicitudesFacturacion.add(String(s.facturaId));
+    });
+
 
 
     // Solo cargar registros NUEVOS (creados desde la app, no históricos del Excel)
@@ -1138,6 +1146,7 @@ function renderControl(){
   data = data.reverse();
   document.getElementById("ctrl-table").innerHTML = data.map(function(x){
     const isPaid = x.estado === 'pagado';
+    const isSolicitado = !isPaid && solicitudesFacturacion.has(String(x.id));
     return '<tr>'
 +'<td style="font-weight:700;color:#185FA5;font-size:12px">'+x.factura+'</td>'
 +'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span>'+(parseInt(x.npref||0)>=52?'<button class="btn btn-sm" onclick="reimprimirPF('+x.id+')"><i class="ti ti-printer"></i></button>':'' )+'</td>'
@@ -1152,7 +1161,9 @@ function renderControl(){
 +'<td style="font-size:11px;color:#6b7694">'+(x.comprobante||"-")+'</td>'
 +'<td>'+(isPaid
   ?'<span class="badge badge-ok">Pagado</span>'
-  :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
+  :isSolicitado
+    ?'<span class="badge badge-solicitado">Solicitado facturación</span>'
+    :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
 +'<td>'+(isPaid?'':'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')+' <span style="position:relative;display:inline-block"><button class="btn btn-sm" title="Bitácora de registro" onclick="abrirBitacora('+x.id+')"><i class="ti ti-notes"></i></button>'+(getNotasPedidoDe(x.id).length?'<span style="position:absolute;top:-6px;right:-6px;background:#185FA5;color:white;border-radius:999px;min-width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1">'+getNotasPedidoDe(x.id).length+'</span>':'')+'</span>'+'</td>'
 +'</td>'+'</tr>';
   }).join("");
@@ -1291,6 +1302,25 @@ function agregarFacturaPendiente(pf){
 // (no se sobrescriben). Viven en el array `notasPedido` (cargado desde la
 // hoja "NotasPedido" del Sheet) y se agregan una por una vía la API.
 const notasPedido = [];
+
+// Prefacturas ya incluidas en algún Pedido de Facturación generado o
+// descargado. Se usa para mostrar "Solicitado facturación" en vez de
+// "Pendiente" en Control de Facturas.
+const solicitudesFacturacion = new Set();
+
+async function marcarSeleccionadasComoSolicitadas(selected){
+  for(const f of selected){
+    const idStr = String(f.id);
+    if(solicitudesFacturacion.has(idStr)) continue; // ya marcada, no repetir llamada
+    solicitudesFacturacion.add(idStr); // optimista: actualizar UI de inmediato
+    try{
+      const r = await apiPost({action:'marcarSolicitado', facturaId:f.id, npref:f.npref||f.id, cliente:f.cliente});
+      if(!r || r.error) console.error('No se pudo marcar como solicitada la PF-'+(f.npref||f.id)+':', r&&r.error);
+    }catch(e){ console.error('Error marcando solicitud de facturación:', e); }
+  }
+  if(document.getElementById('ctrl-table')) renderControl();
+}
+
 
 function formatoNotasPedido(facturaId){
   const lista = getNotasPedidoDe(facturaId);
@@ -1496,6 +1526,8 @@ function generarPedido(){
     if(!confirm(msg)) return;
   }
 
+  marcarSeleccionadasComoSolicitadas(selected);
+
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
@@ -1577,6 +1609,7 @@ function generarPedido(){
 function descargarPedidoExcel(){
   const selected = getSeleccionadas(); if(!selected) return;
   const err2=[];selected.forEach(function(f){if(['55','56','57','58','59','60','61','62'].includes(String(f.npref))) return;const pf2=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
+  marcarSeleccionadasComoSolicitadas(selected);
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub,iva:a.iva+r.iva,tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
@@ -1660,6 +1693,7 @@ totRow.eachCell({includeEmpty:true},(cell,colNum)=>{
 function descargarPedidoPDF(){
   const selected = getSeleccionadas(); if(!selected) return;
   const err3=[];selected.forEach(function(f){const pf3=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr3=Object.values(pf3).reduce((a,b)=>a+b,0);if(tr3!==f.qty)err3.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr3);});if(err3.length&&!confirm('Consumos no cuadran:\n'+err3.join('\n')+'\n\n¿Continuar?')) return;
+  marcarSeleccionadasComoSolicitadas(selected);
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
   const totales = filas.reduce((a,r)=>({sub:a.sub+r.sub, iva:a.iva+r.iva, tot:a.tot+r.tot}),{sub:0,iva:0,tot:0});
