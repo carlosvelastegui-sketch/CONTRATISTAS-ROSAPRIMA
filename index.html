@@ -1512,8 +1512,8 @@ function generarPedido(){
           <th style="padding:8px 6px;text-align:center">R6</th>
           <th style="padding:8px 10px;text-align:left">Servicio</th>
           <th style="padding:8px 10px;text-align:left">N° Comprobante</th>
-          <th style="padding:8px 10px;text-align:left">Fecha Registro</th>
-          <th style="padding:8px 10px;text-align:left">Nota / Observación</th>
+          <th style="padding:8px 10px;text-align:left;white-space:nowrap">Fecha Registro</th>
+          <th style="padding:8px 10px;text-align:left;min-width:160px">Nota / Observación</th>
           <th style="padding:8px 10px;text-align:right">P. Neto</th>
           <th style="padding:8px 10px;text-align:right">Subtotal</th>
           <th style="padding:8px 10px;text-align:right">IVA 15%</th>
@@ -1537,8 +1537,8 @@ function generarPedido(){
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.f.comprobante||'—'}</td>
-          <td style="padding:8px 10px;color:#6b7694">${formatoNotasPedido(r.f.id).fechas}</td>
-          <td style="padding:8px 10px;color:#6b7694">${formatoNotasPedido(r.f.id).notas}</td>
+          <td style="padding:8px 10px;color:#6b7694;white-space:nowrap">${formatoNotasPedido(r.f.id).fechas}</td>
+          <td style="padding:8px 10px;color:#6b7694;white-space:normal;word-break:break-word;max-width:220px">${formatoNotasPedido(r.f.id).notas}</td>
           <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
@@ -1600,12 +1600,19 @@ function descargarPedidoExcel(){
   filas.forEach(r=>{
     const n=formatoNotasPedido(r.f.id);
     const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',n.fechas||'',n.notas||'',r.precioU,r.sub,r.iva,r.tot]);
-    row.height=18;
+    // Ajustar el alto de la fila según el largo del texto de fecha/nota,
+    // para que ninguna de las dos quede cortada.
+    const largoNota = (n.notas||'').length;
+    const largoFecha = (n.fechas||'').length;
+    const lineasNota = Math.max(1, Math.ceil(largoNota / 30));
+    const lineasFecha = Math.max(1, Math.ceil(largoFecha / 18));
+    row.height = Math.max(18, Math.max(lineasNota, lineasFecha) * 14);
     row.eachCell({includeEmpty:true},(cell,colNum)=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_LIGHT}};
       cell.border=mkBorder('B5D4F4');
       cell.font={name:'Arial',size:9,color:{argb:'FF1A1A2E'}};
       if(numCols.has(colNum)){cell.alignment={horizontal:colNum>=17?'right':'center',vertical:'middle'};if(colNum>=17)cell.numFmt='#,##0.0000';}
+      else if(colNum===15||colNum===16){cell.alignment={horizontal:'left',vertical:'middle',wrapText:true};}
       else{cell.alignment={horizontal:'left',vertical:'middle'};}
     });
   });
@@ -1672,8 +1679,8 @@ function descargarPedidoPDF(){
           <th style="padding:7px 4px;text-align:center">R5</th>
           <th style="padding:7px 4px;text-align:center">R6</th>
           <th style="padding:7px 8px;text-align:left">Servicio</th>
-          <th style="padding:7px 8px;text-align:left">Fecha Registro</th>
-          <th style="padding:7px 8px;text-align:left">Nota / Observación</th>
+          <th style="padding:7px 8px;text-align:left;white-space:nowrap">Fecha Registro</th>
+          <th style="padding:7px 8px;text-align:left;min-width:140px">Nota / Observación</th>
           <th style="padding:7px 8px;text-align:right">P. Neto</th>
           <th style="padding:7px 8px;text-align:right">Subtotal</th>
           <th style="padding:7px 8px;text-align:right">IVA 15%</th>
@@ -1696,8 +1703,8 @@ function descargarPedidoPDF(){
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R5']||''}</td>
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:7px 8px">${r.f.servicio||'Almuerzo Operativo'}</td>
-          <td style="padding:7px 8px;color:#555">${formatoNotasPedido(r.f.id).fechas}</td>
-          <td style="padding:7px 8px;color:#555">${formatoNotasPedido(r.f.id).notas}</td>
+          <td style="padding:7px 8px;color:#555;white-space:nowrap">${formatoNotasPedido(r.f.id).fechas}</td>
+          <td style="padding:7px 8px;color:#555;white-space:normal;word-break:break-word;max-width:200px">${formatoNotasPedido(r.f.id).notas}</td>
           <td style="padding:7px 8px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
           <td style="padding:7px 8px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:7px 8px;text-align:right">${fmt(r.iva)}</td>
