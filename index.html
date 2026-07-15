@@ -1039,28 +1039,44 @@ function getConsumoFIFOCliente(cliente){
     const key = String(f.npref);
     if(vistos.has(key)) return;
     vistos.add(key);
-    pfs.push({id:f.npref, qty:parseInt(f.qty)||0});
+    pfs.push({id:f.npref, qty:parseInt(f.qty)||0, fecha:toISODate(f.fecha), estado:f.estado});
   });
   pfs.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
 
-  // Consumo real: TODO el historial (consumosHistoricos + consumos nuevos)
-  const cons = consumosHistoricos.concat(consumos).filter(x=>x.cliente===cliente).sort((a,b)=>{
+  // Si el cliente NO tiene ninguna prefactura histórica itemizada (npref
+  // < 52) en la hoja "Facturas", su historial anterior a la app ya quedó
+  // resumido como un número neto en SALDOS_BASE (no itemizado por
+  // prefactura). En ese caso, NO hay que sumar consumosHistoricos aquí.
+  const tieneHistoricasItemizadas = pfs.some(pf=>parseInt(pf.id) < 52);
+  const fuenteConsumo = tieneHistoricasItemizadas ? consumosHistoricos.concat(consumos) : consumos;
+  const cons = fuenteConsumo.filter(x=>x.cliente===cliente).sort((a,b)=>{
     const fa=toISODate(a.fecha), fb=toISODate(b.fecha);
     if(fa!==fb) return fa<fb?-1:1;
     return (parseInt(a.id)||0)-(parseInt(b.id)||0);
   });
-  const unidades = [];
-  cons.forEach(c=>{ for(let i=0;i<c.qty;i++) unidades.push(c.finca||'R1'); });
 
-  let cursor = 0;
   const resultado = {};
   pfs.forEach(pf=>{
+    // Una prefactura ya PAGADA se da por completamente cerrada, sin
+    // importar si el consumo real llegó exacto a su cupo — ya se facturó
+    // y cobró, así que no debe seguir "reservando" cupo indefinidamente.
+    if(pf.estado === 'pagado'){
+      resultado[pf.id] = {porFinca:{}, totalReal: pf.qty};
+      return;
+    }
+    // Prefactura PENDIENTE: el consumo que le corresponde es el real
+    // registrado DESDE la propia fecha de la prefactura en adelante,
+    // hasta llenar su cupo (no depende de ninguna otra prefactura).
     const porFinca = {};
     let asignados = 0;
-    while(asignados < pf.qty && cursor < unidades.length){
-      const f = unidades[cursor];
-      porFinca[f] = (porFinca[f]||0)+1;
-      asignados++; cursor++;
+    for(const c of cons){
+      if(asignados >= pf.qty) break;
+      if(toISODate(c.fecha) < pf.fecha) continue;
+      const restante = pf.qty - asignados;
+      const tomar = Math.min(c.qty, restante);
+      const f = c.finca || 'R1';
+      porFinca[f] = (porFinca[f]||0) + tomar;
+      asignados += tomar;
     }
     resultado[pf.id] = {porFinca, totalReal:asignados};
   });
@@ -1070,6 +1086,7 @@ function getConsumoFIFOCliente(cliente){
 // Desglose por finca de UNA prefactura específica, identificada por su id
 // de prefactura (npref).
 function getFincaBreakdown(cliente, pfId){
+
   const fifo = getConsumoFIFOCliente(cliente);
   const entry = fifo[parseInt(pfId)];
   return entry ? entry.porFinca : {};
@@ -1465,29 +1482,8 @@ function calcFilaPF(f){
   const factPF = facturas.find(x=>String(x.npref)===String(f.npref||f.id));
   if(factPF && factPF.comprobante) f = Object.assign({}, f, {comprobante: factPF.comprobante});
   const precioU = getPrecioPF(f.servicio, f.precioUnit);
-  // PF-55 excepcion: consumos confirmados 36 R1 + 4 R3 + 2 R6 = 42
-  // PF-56 excepcion: consumos confirmados Hanaska 21-abr al 23-jun = 138
-  let porFinca;
-  if(String(f.npref) === '55'){
-    porFinca = {'R1': 36, 'R3': 4, 'R6': 2};
-  } else if(String(f.npref) === '56'){
-    porFinca = {'R1': 46, 'R2': 2, 'R3': 11, 'R4': 36, 'R6': 43};
-  } else if(String(f.npref) === '57'){
-    porFinca = {'R2': 3};
-  } else if(String(f.npref) === '58'){
-    porFinca = {'R2': 3};
-  } else if(String(f.npref) === '59'){
-    porFinca = {'R2': 4};
-  } else if(String(f.npref) === '60'){
-    porFinca = {'R2': 3};
-  } else if(String(f.npref) === '61'){
-    porFinca = {'R3': 162};
-  } else if(String(f.npref) === '62'){
-    porFinca = {'R4': 63};
-  } else {
-    porFinca = getFincaBreakdown(f.cliente, f.npref||f.id, f.qty);
-  }
-  const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0) || f.qty;
+  const porFinca = getFincaBreakdown(f.cliente, f.npref||f.id, f.qty);
+  const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0);
   const sub = parseFloat((totalReal * precioU).toFixed(4));
   const iva = parseFloat((sub * 0.15).toFixed(4));
   const tot = parseFloat((sub + iva).toFixed(4));
@@ -1535,7 +1531,6 @@ function generarPedido(){
   // Validar que consumos reales cuadren con lo prepagado
   const errores = [];
   selected.forEach(function(f){
-    if(['55','56','57','58','59','60','61','62'].includes(String(f.npref))) return;
     const porFinca = getFincaBreakdown(f.cliente, f.npref||f.id, f.qty);
     const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0);
     if(totalReal < f.qty){
@@ -1632,7 +1627,7 @@ function generarPedido(){
 
 function descargarPedidoExcel(){
   const selected = getSeleccionadas(); if(!selected) return;
-  const err2=[];selected.forEach(function(f){if(['55','56','57','58','59','60','61','62'].includes(String(f.npref))) return;const pf2=getFincaBreakdown(f.cliente,f.npref||f.id,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
+  const err2=[];selected.forEach(function(f){const pf2=getFincaBreakdown(f.cliente,f.npref||f.id,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
   marcarSeleccionadasComoSolicitadas(selected);
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
