@@ -333,6 +333,7 @@ tbody tr:hover td{background:#f8f9fb}
               <th>Contratista</th>
               <th>Servicio</th>
               <th class="num">Alm.</th>
+              <th style="min-width:150px">Consumo</th>
               <th class="num">Total</th>
               <th>Ref. Pago</th>
               <th class="num">Valor Pagado</th>
@@ -1147,6 +1148,12 @@ function renderControl(){
   document.getElementById("ctrl-table").innerHTML = data.map(function(x){
     const isPaid = x.estado === 'pagado';
     const isSolicitado = !isPaid && solicitudesFacturacion.has(String(x.id));
+    // Consumo real registrado contra lo prepagado en esta prefactura
+    const porFincaX = getFincaBreakdown(x.cliente, x.fecha, x.qty);
+    const consumidoReal = Object.values(porFincaX).reduce((a,b)=>a+b,0);
+    const pctConsumo = x.qty>0 ? Math.min(100, Math.round((consumidoReal/x.qty)*100)) : 0;
+    const alTope = x.qty>0 && consumidoReal >= x.qty;
+    const colorBarra = alTope ? '#A32D2D' : pctConsumo>=70 ? '#854F0B' : '#3B6D11';
     return '<tr>'
 +'<td style="font-weight:700;color:#185FA5;font-size:12px">'+x.factura+'</td>'
 +'<td style="font-size:11px;white-space:nowrap"><span style="color:#6b7694;font-weight:600">PF-'+(String(x.npref||x.id).padStart(5,"0"))+'</span>'+(parseInt(x.npref||0)>=52?'<button class="btn btn-sm" onclick="reimprimirPF('+x.id+')"><i class="ti ti-printer"></i></button>':'' )+'</td>'
@@ -1154,6 +1161,7 @@ function renderControl(){
 +'<td style="font-size:12px">'+sh(x.cliente,18)+'</td>'
 +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
 +'<td class="num">'+x.qty+'</td>'
++'<td style="min-width:150px"><div style="font-size:11px;color:#6b7694;margin-bottom:3px">'+consumidoReal+' / '+x.qty+' alm. ('+pctConsumo+'%)</div><div style="background:#f0f2f5;border-radius:6px;height:7px;overflow:hidden;margin-bottom:3px"><div style="width:'+pctConsumo+'%;background:'+colorBarra+';height:100%;border-radius:6px"></div></div>'+(alTope && !isPaid && !isSolicitado?'<div style="font-size:10px;font-weight:700;color:#A32D2D">⚠ Solicite facturación</div>':'')+'</td>'
 +'<td class="num">'+fmt(x.total)+'</td>'
 +'<td style="font-size:11px;color:#6b7694">'+(x.refPago||"-")+'</td>'
 +'<td class="num">'+(x.valorPagado?fmt(x.valorPagado):"-")+'</td>'
