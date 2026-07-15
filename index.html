@@ -492,6 +492,27 @@ tbody tr:hover td{background:#f8f9fb}
   </div>
 </div>
 
+<!-- MODAL BITÁCORA DE REGISTRO (fecha + nota, varias por prefactura) -->
+<div class="modal-overlay" id="modal-nota-pedido">
+  <div class="modal" style="width:520px;max-height:85vh;overflow-y:auto">
+    <div class="modal-title">🗒️ Bitácora de registro</div>
+    <div style="background:#f8f9fb;border-radius:8px;padding:12px 16px;margin-bottom:14px;font-size:13px" id="mnota-resumen"></div>
+    <div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:6px">Entradas registradas</div>
+    <div id="mnota-lista" style="border:1px solid #e2e6ed;border-radius:8px;margin-bottom:16px;max-height:220px;overflow-y:auto"></div>
+    <div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:6px">Agregar nueva entrada</div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha de registro en el sistema</label>
+        <input type="date" id="mnota-fecha"></div>
+      <div class="form-group"><label>Nota / observación</label>
+        <input type="text" id="mnota-texto" placeholder="Opcional..."></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-success" onclick="agregarEntradaBitacora()"><i class="ti ti-plus"></i> Agregar entrada</button>
+      <button class="btn" onclick="document.getElementById('modal-nota-pedido').classList.remove('open')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 
 
 <!-- MODAL PEDIDO DE FACTURACIÓN -->
@@ -646,21 +667,28 @@ function apiPost(data){
 async function cargarDatosCloud(){
   console.log('Cargando datos de la nube...');
   try {
-    const [cons, pfs, facts, clis] = await Promise.all([
+    const [cons, pfs, facts, clis, notasP] = await Promise.all([
       apiGet('getConsumos'),
       apiGet('getPrefacturas'),
       apiGet('getFacturas'),
-      apiGet('getClientes')
+      apiGet('getClientes'),
+      apiGet('getNotasPedido')
     ]);
     // Limpiar arrays antes de cargar desde la nube (evitar duplicados)
     consumos.length = 0;
     prefacturas.length = 0;
     facturas.length = 0;
     clientes.length = 0;
+    notasPedido.length = 0;
     // Cargar clientes desde el Sheet
     if(Array.isArray(clis)) clis.forEach(x=>{
       if(x.nombre) clientes.push({id:x.id||'',nombre:String(x.nombre).trim(),ruc:x.ruc||'',tel:x.tel||'',correo:x.correo||'',dir:x.dir||''});
     });
+    // Cargar bitácora de fechas/notas del pedido de facturación
+    if(Array.isArray(notasP)) notasP.forEach(n=>{
+      if(n.id!==undefined && n.id!=='') notasPedido.push({id:n.id, facturaId:parseInt(n.facturaId)||n.facturaId, npref:n.npref||'', cliente:n.cliente||'', fecha:(n.fecha||'').toString().slice(0,10), nota:n.nota||''});
+    });
+
 
     // Solo cargar registros NUEVOS (creados desde la app, no históricos del Excel)
     if(Array.isArray(cons)) cons.forEach(x=>{
@@ -1113,7 +1141,7 @@ function renderControl(){
 +'<td>'+(isPaid
   ?'<span class="badge badge-ok">Pagado</span>'
   :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
-+'<td>'+(isPaid?'':'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')+'</td>'
++'<td>'+(isPaid?'':'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')+' <button class="btn btn-sm" title="Bitácora de registro" onclick="abrirBitacora('+x.id+')"><i class="ti ti-notes"></i></button>'+'</td>'
 +'</td>'+'</tr>';
   }).join("");
 }
@@ -1247,28 +1275,93 @@ function agregarFacturaPendiente(pf){
 }
 
 /* ── PEDIDO DE FACTURACIÓN ─────────────────────────────── */
-// La fecha de registro en el sistema y la nota/observación de cada
-// prefactura se guardan directamente en el objeto `factura` (propiedades
-// fechaRegistroPedido y notaPedido) y se persisten en la hoja "Facturas"
-// del Google Sheet mediante la acción 'updateNotaPedido'. Así quedan
-// guardadas aunque cierres o recargues la app.
-function getNotaPedido(facturaId){
-  const f = facturas.find(x=>x.id===facturaId);
-  if(!f) return {fechaReg:'', nota:''};
-  return {fechaReg:f.fechaRegistroPedido||'', nota:f.notaPedido||''};
+// Bitácora: cada prefactura puede tener VARIAS entradas de fecha+nota
+// (no se sobrescriben). Viven en el array `notasPedido` (cargado desde la
+// hoja "NotasPedido" del Sheet) y se agregan una por una vía la API.
+const notasPedido = [];
+
+function formatoNotasPedido(facturaId){
+  const lista = getNotasPedidoDe(facturaId);
+  if(!lista.length) return {fechas:'—', notas:'—'};
+  return {
+    fechas: lista.map(n=>n.fecha||'—').join(' / '),
+    notas: lista.map(n=>n.nota).filter(Boolean).join(' | ') || '—'
+  };
 }
-async function guardarNotaPedido(facturaId, campo, valor){
+
+function getNotasPedidoDe(facturaId){
+  return notasPedido
+    .filter(n=>String(n.facturaId)===String(facturaId))
+    .sort((a,b)=> String(a.fecha||'').localeCompare(String(b.fecha||'')));
+}
+
+let bitacoraFacturaId = null;
+function abrirBitacora(facturaId){
   const f = facturas.find(x=>x.id===facturaId);
+  if(!f){ alert('No se encontró la prefactura.'); return; }
+  bitacoraFacturaId = facturaId;
+  document.getElementById('mnota-resumen').innerHTML =
+    '<strong>PF-'+String(f.npref||f.id).padStart(5,'0')+'</strong> · '+f.cliente+' · '+f.qty+' alm.';
+  document.getElementById('mnota-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mnota-texto').value = '';
+  renderListaBitacora();
+  document.getElementById('modal-nota-pedido').classList.add('open');
+}
+
+function renderListaBitacora(){
+  const lista = getNotasPedidoDe(bitacoraFacturaId);
+  const cont = document.getElementById('mnota-lista');
+  if(!lista.length){
+    cont.innerHTML = '<div style="padding:14px;color:#94a3b8;text-align:center;font-size:12px">Todavía no hay entradas registradas</div>';
+    return;
+  }
+  cont.innerHTML = lista.map(n=>
+    '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-bottom:1px solid #f0f2f5;font-size:12px">'
+    +'<span style="font-weight:600;color:#185FA5;white-space:nowrap">'+(n.fecha||'—')+'</span>'
+    +'<span style="flex:1;color:#0f1c3f">'+(n.nota?String(n.nota).replace(/</g,'&lt;'):'<span style=\"color:#94a3b8\">Sin nota</span>')+'</span>'
+    +'<button class="btn btn-sm" title="Eliminar" onclick="eliminarEntradaBitacora(\''+n.id+'\')"><i class="ti ti-trash"></i></button>'
+    +'</div>'
+  ).join('');
+}
+
+async function agregarEntradaBitacora(){
+  const f = facturas.find(x=>x.id===bitacoraFacturaId);
   if(!f) return;
-  if(campo==='fechaReg') f.fechaRegistroPedido = valor;
-  if(campo==='nota') f.notaPedido = valor;
+  const fecha = document.getElementById('mnota-fecha').value;
+  const nota = document.getElementById('mnota-texto').value.trim();
+  if(!fecha && !nota){ alert('Ingresa al menos la fecha o la nota.'); return; }
   try{
-    const r = await apiPost({action:'updateNotaPedido', id:f.id, npref:f.npref||f.id, fechaRegistroPedido:f.fechaRegistroPedido||'', notaPedido:f.notaPedido||''});
-    if(!r || r.error){
-      console.error('No se pudo guardar la nota del pedido:', r && r.error);
-    }
-  }catch(e){ console.error('Error guardando nota del pedido:', e); }
+    const r = await apiPost({action:'addNotaPedido', facturaId:f.id, npref:f.npref||f.id, cliente:f.cliente, fecha:fecha||'', nota:nota||''});
+    if(!r || r.error){ alert('No se pudo guardar la entrada: '+((r&&r.error)||'error desconocido')); return; }
+    notasPedido.push({id:r.id, facturaId:f.id, npref:f.npref||f.id, cliente:f.cliente, fecha:fecha||'', nota:nota||''});
+    document.getElementById('mnota-texto').value = '';
+    renderListaBitacora();
+    renderPedidoSelectorResumen();
+  }catch(e){ alert('Error de conexión al guardar la entrada.'); console.error(e); }
 }
+
+async function eliminarEntradaBitacora(id){
+  if(!confirm('¿Eliminar esta entrada de la bitácora?')) return;
+  try{
+    const r = await apiPost({action:'deleteNotaPedido', id:id});
+    if(!r || r.error){ alert('No se pudo eliminar: '+((r&&r.error)||'error desconocido')); return; }
+    const idx = notasPedido.findIndex(n=>String(n.id)===String(id));
+    if(idx>=0) notasPedido.splice(idx,1);
+    renderListaBitacora();
+    renderPedidoSelectorResumen();
+  }catch(e){ alert('Error de conexión al eliminar.'); console.error(e); }
+}
+
+// Refresca solo el conteo de entradas mostrado junto a cada PF en el
+// selector del pedido de facturación, sin redibujar todo el modal.
+function renderPedidoSelectorResumen(){
+  document.querySelectorAll('#pf-selector [data-bitacora-count]').forEach(el=>{
+    const fid = parseInt(el.getAttribute('data-bitacora-count'));
+    const n = getNotasPedidoDe(fid).length;
+    el.textContent = n ? (n+' entrada'+(n>1?'s':'')) : 'Sin entradas';
+  });
+}
+
 const PRECIOS_PF = {
   "Almuerzo Operativo":        {neto:1.7217, iva:0.2583,  total:1.98},
   "Almuerzo Administrativo":   {neto:1.8261, iva:0.2739,  total:2.10},
@@ -1341,19 +1434,20 @@ function showPedidoFact(){
     selector.innerHTML='<div style="padding:12px;color:#94a3b8;text-align:center">No hay prefacturas pendientes de pago</div>';
   } else {
     selector.innerHTML = pendientes.map(f=>{
-      const n = getNotaPedido(f.id);
+      const n = getNotasPedidoDe(f.id).length;
       return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;border-bottom:1px solid #f0f2f5;flex-wrap:wrap">'
       +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:260px">'
       +'<input type="checkbox" value="'+f.id+'" style="width:16px;height:16px"> '
       +'<span style="font-size:13px"><strong>PF-'+String(f.npref||f.id).padStart(5,"0")+'</strong> · '+f.cliente+' · '+f.qty+' alm. · '+fmt(f.total)+' · '+f.fecha+'</span>'
       +'</label>'
-      +'<input type="date" title="Fecha de registro en el sistema" value="'+(n.fechaReg||'')+'" onchange="guardarNotaPedido('+f.id+',\'fechaReg\',this.value)" style="font-size:12px;padding:5px 6px;border:1px solid #e2e6ed;border-radius:6px;color:#0f1c3f">'
-      +'<input type="text" placeholder="Nota / observación" value="'+(n.nota||'').replace(/"/g,"&quot;")+'" onchange="guardarNotaPedido('+f.id+',\'nota\',this.value)" style="font-size:12px;padding:5px 8px;border:1px solid #e2e6ed;border-radius:6px;flex:1;min-width:160px">'
+      +'<span data-bitacora-count="'+f.id+'" style="font-size:11px;color:#6b7694;white-space:nowrap">'+(n?(n+' entrada'+(n>1?'s':'')):'Sin entradas')+'</span>'
+      +'<button type="button" class="btn btn-sm" onclick="abrirBitacora('+f.id+')"><i class="ti ti-notes"></i> Bitácora</button>'
       +'</div>';
     }).join('');
   }
   document.getElementById('modal-pedido-fact').classList.add('open');
 }
+
 
 function cerrarPedido(){
   document.getElementById('modal-pedido-fact').classList.remove('open');
@@ -1443,8 +1537,8 @@ function generarPedido(){
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.f.comprobante||'—'}</td>
-          <td style="padding:8px 10px;color:#6b7694">${getNotaPedido(r.f.id).fechaReg||'—'}</td>
-          <td style="padding:8px 10px;color:#6b7694">${getNotaPedido(r.f.id).nota||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${formatoNotasPedido(r.f.id).fechas}</td>
+          <td style="padding:8px 10px;color:#6b7694">${formatoNotasPedido(r.f.id).notas}</td>
           <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
@@ -1504,8 +1598,8 @@ function descargarPedidoExcel(){
   // Filas datos
   const numCols=new Set([6,7,8,9,10,11,12,17,18,19,20]);
   filas.forEach(r=>{
-    const n=getNotaPedido(r.f.id);
-    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',n.fechaReg||'',n.nota||'',r.precioU,r.sub,r.iva,r.tot]);
+    const n=formatoNotasPedido(r.f.id);
+    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',n.fechas||'',n.notas||'',r.precioU,r.sub,r.iva,r.tot]);
     row.height=18;
     row.eachCell({includeEmpty:true},(cell,colNum)=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_LIGHT}};
@@ -1602,8 +1696,8 @@ function descargarPedidoPDF(){
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R5']||''}</td>
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:7px 8px">${r.f.servicio||'Almuerzo Operativo'}</td>
-          <td style="padding:7px 8px;color:#555">${getNotaPedido(r.f.id).fechaReg||'—'}</td>
-          <td style="padding:7px 8px;color:#555">${getNotaPedido(r.f.id).nota||'—'}</td>
+          <td style="padding:7px 8px;color:#555">${formatoNotasPedido(r.f.id).fechas}</td>
+          <td style="padding:7px 8px;color:#555">${formatoNotasPedido(r.f.id).notas}</td>
           <td style="padding:7px 8px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
           <td style="padding:7px 8px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:7px 8px;text-align:right">${fmt(r.iva)}</td>
