@@ -1063,6 +1063,17 @@ function getConsumoFIFOCliente(cliente){
   let cursor = 0;
   const resultado = {}; // id de prefactura -> {porFinca, totalReal}
   pfs.forEach(pf=>{
+    // Una prefactura ya PAGADA se da por completamente cerrada, sin
+    // importar si el consumo real llegó exacto a su cupo. Así no se queda
+    // "atajando" el consumo real y bloqueando que fluya hacia la
+    // siguiente prefactura (esto fue lo que pasó con PF-62 de Efrain
+    // Imbaquingo bloqueando el consumo de PF-63).
+    const facturaDePF = facturas.find(f=>String(f.npref)===String(pf.id));
+    const yaPagada = facturaDePF && facturaDePF.estado==='pagado';
+    if(yaPagada){
+      resultado[pf.id] = {porFinca:{}, totalReal:pf.qty};
+      return;
+    }
     const porFinca = {};
     let asignados = 0;
     while(asignados < pf.qty && cursor < unidades.length){
