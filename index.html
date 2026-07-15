@@ -717,13 +717,14 @@ function apiPost(data){
 async function cargarDatosCloud(){
   console.log('Cargando datos de la nube...');
   try {
-    const [cons, pfs, facts, clis, notasP, solF] = await Promise.all([
+    const [cons, pfs, facts, clis, notasP, solF, conMan] = await Promise.all([
       apiGet('getConsumos'),
       apiGet('getPrefacturas'),
       apiGet('getFacturas'),
       apiGet('getClientes'),
       apiGet('getNotasPedido'),
-      apiGet('getSolicitudesFacturacion')
+      apiGet('getSolicitudesFacturacion'),
+      apiGet('getConsumoManual')
     ]);
     // Limpiar arrays antes de cargar desde la nube (evitar duplicados)
     consumos.length = 0;
@@ -732,6 +733,7 @@ async function cargarDatosCloud(){
     clientes.length = 0;
     notasPedido.length = 0;
     solicitudesFacturacion.clear();
+    consumoManualMap.clear();
     // Cargar clientes desde el Sheet
     if(Array.isArray(clis)) clis.forEach(x=>{
       if(x.nombre) clientes.push({id:x.id||'',nombre:String(x.nombre).trim(),ruc:x.ruc||'',tel:x.tel||'',correo:x.correo||'',dir:x.dir||''});
@@ -743,6 +745,10 @@ async function cargarDatosCloud(){
     // Cargar qué prefacturas ya fueron solicitadas en un pedido de facturación
     if(Array.isArray(solF)) solF.forEach(s=>{
       if(s.facturaId!==undefined && s.facturaId!=='') solicitudesFacturacion.add(String(s.facturaId));
+    });
+    // Cargar el consumo "manual" fijado para la columna Consumo (no afecta saldos)
+    if(Array.isArray(conMan)) conMan.forEach(m=>{
+      if(m.npref!==undefined && m.npref!=='' && m.valor!==undefined && m.valor!=='') consumoManualMap.set(String(m.npref), parseInt(m.valor)||0);
     });
 
 
@@ -1198,7 +1204,15 @@ function renderControl(){
     const isSolicitado = !isPaid && solicitudesFacturacion.has(String(x.id));
     // Consumo real registrado contra lo prepagado en esta prefactura
     const porFincaX = getFincaBreakdown(x.cliente, x.npref||x.id, x.qty);
-    const consumidoReal = Object.values(porFincaX).reduce((a,b)=>a+b,0);
+    const consumidoCalculado = Object.values(porFincaX).reduce((a,b)=>a+b,0);
+    // Si esta prefactura tiene un valor "manual" guardado, se muestra ese
+    // en vez del calculado. Esto es SOLO para lo que se ve en pantalla —
+    // no toca los registros de consumo reales, y por lo tanto NO afecta
+    // el saldo de Estado de Cuenta ni de Consumo Diario, que siguen
+    // calculándose siempre con el consumo real de siempre.
+    const npfKey = String(x.npref||x.id);
+    const tieneManual = consumoManualMap.has(npfKey);
+    const consumidoReal = tieneManual ? consumoManualMap.get(npfKey) : consumidoCalculado;
     const pctConsumo = x.qty>0 ? Math.min(100, Math.round((consumidoReal/x.qty)*100)) : 0;
     const alTope = x.qty>0 && consumidoReal >= x.qty;
     const colorBarra = alTope ? '#A32D2D' : pctConsumo>=70 ? '#854F0B' : '#3B6D11';
@@ -1209,7 +1223,7 @@ function renderControl(){
 +'<td style="font-size:12px">'+sh(x.cliente,18)+'</td>'
 +'<td style="font-size:11px;color:#6b7694">'+(x.servicio||"Almuerzo Operativo")+'</td>'
 +'<td class="num">'+x.qty+'</td>'
-+'<td style="min-width:150px"><div style="font-size:11px;color:#6b7694;margin-bottom:3px">'+consumidoReal+' / '+x.qty+' alm. ('+pctConsumo+'%)</div><div style="background:#f0f2f5;border-radius:6px;height:7px;overflow:hidden;margin-bottom:3px"><div style="width:'+pctConsumo+'%;background:'+colorBarra+';height:100%;border-radius:6px"></div></div>'+(alTope && !isPaid && !isSolicitado?'<div style="font-size:10px;font-weight:700;color:#A32D2D">⚠ Solicite facturación</div>':'')+'</td>'
++'<td style="min-width:150px"><div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#6b7694;margin-bottom:3px"><span>'+consumidoReal+' / '+x.qty+' alm. ('+pctConsumo+'%)'+(tieneManual?' <span title="Valor fijado manualmente, no viene del consumo real" style="color:#185FA5;font-weight:700">✎</span>':'')+'</span><button class="btn btn-sm" title="Fijar manualmente el consumo mostrado aquí (no afecta saldos)" onclick="editarConsumoManual(\''+npfKey+'\','+x.qty+')" style="padding:1px 5px;font-size:10px;margin-left:auto"><i class="ti ti-pencil"></i></button></div><div style="background:#f0f2f5;border-radius:6px;height:7px;overflow:hidden;margin-bottom:3px"><div style="width:'+pctConsumo+'%;background:'+colorBarra+';height:100%;border-radius:6px"></div></div>'+(alTope && !isPaid && !isSolicitado?'<div style="font-size:10px;font-weight:700;color:#A32D2D">⚠ Solicite facturación</div>':'')+'</td>'
 +'<td class="num">'+fmt(x.total)+'</td>'
 +'<td style="font-size:11px;color:#6b7694">'+(x.refPago||"-")+'</td>'
 +'<td class="num">'+(x.valorPagado?fmt(x.valorPagado):"-")+'</td>'
@@ -1363,6 +1377,27 @@ const notasPedido = [];
 // descargado. Se usa para mostrar "Solicitado facturación" en vez de
 // "Pendiente" en Control de Facturas.
 const solicitudesFacturacion = new Set();
+
+// Consumo "manual" mostrado en Control de Facturas: SOLO afecta lo que se
+// ve en pantalla en esa columna. No toca ningún registro de consumo real,
+// por lo tanto NUNCA afecta el saldo de Estado de Cuenta ni de Consumo
+// Diario. Se guarda por npref (número de prefactura) en su propia hoja.
+const consumoManualMap = new Map();
+
+async function editarConsumoManual(npref, qtyMax){
+  const actual = consumoManualMap.has(npref) ? consumoManualMap.get(npref) : '';
+  const entrada = prompt('¿Cuántos almuerzos quieres que se muestren como consumidos en PF-'+String(npref).padStart(5,'0')+' (de '+qtyMax+')?\n\nEsto SOLO cambia lo que se ve aquí — no afecta el saldo real del contratista.\n\nDeja el campo vacío y presiona Aceptar para quitar el valor manual y volver al cálculo automático.', actual);
+  if(entrada===null) return; // canceló
+  const valor = entrada.trim()==='' ? null : parseInt(entrada);
+  if(entrada.trim()!=='' && (isNaN(valor) || valor<0)){ alert('Ingresa un número válido (0 o más).'); return; }
+  try{
+    const r = await apiPost({action:'setConsumoManual', npref:npref, valor: valor===null ? '' : valor});
+    if(!r || r.error){ alert('No se pudo guardar: '+((r&&r.error)||'error desconocido')); return; }
+    if(valor===null) consumoManualMap.delete(npref);
+    else consumoManualMap.set(npref, valor);
+    renderControl();
+  }catch(e){ alert('Error de conexión al guardar.'); console.error(e); }
+}
 
 async function marcarSeleccionadasComoSolicitadas(selected){
   for(const f of selected){
