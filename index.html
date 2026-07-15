@@ -200,7 +200,7 @@ tbody tr:hover td{background:#f8f9fb}
           <div class="form-row">
             <div class="form-group"><label>Contratista</label>
               <select id="c-cliente" onchange="mostrarSaldo()"><option value="">Seleccione...</option></select></div>
-            <div class="form-group"><label>Fecha</label><input type="date" id="c-fecha" min="2024-01-01" max="2028-12-31"></div>
+            <div class="form-group"><label>Fecha</label><input type="date" id="c-fecha"></div>
           </div>
           <div id="saldo-display" style="display:none">
             <div class="saldo-card" id="saldo-card">
@@ -255,7 +255,7 @@ tbody tr:hover td{background:#f8f9fb}
                   <option value="Refrigerio 2 Vianda">Refrigerio 2 Vianda — $0.3565</option>
                 </select>
               </div>
-              <div class="form-group"><label>Fecha</label><input type="date" id="p-fecha" min="2024-01-01" max="2028-12-31"></div>
+              <div class="form-group"><label>Fecha</label><input type="date" id="p-fecha"></div>
             </div>
             <div class="form-row">
               <div class="form-group"><label>Cantidad</label>
@@ -589,42 +589,6 @@ let nextFactId = 76;
 let nextPFid = 53; // Se recalcula dinámicamente al cargar datos
 let nextCONid = 352; // IDs de nuevos consumos empiezan en 352
 
-// Normaliza cualquier fecha que venga de Google Sheets a formato YYYY-MM-DD.
-// Google Apps Script a veces devuelve un objeto Date real (no texto) cuando
-// la celda está formateada como fecha; convertirlo con String()/.toString()
-// directamente da algo como "Mon Jul 13 2026 00:00:00 GMT-0500", lo cual
-// rompe cualquier comparación de fechas más adelante. Esta función cubre
-// los 3 casos: objeto Date, ISO (2026-07-13T...), y DD/MM/YYYY.
-function toISODate(v){
-  if(v===null||v===undefined||v==='') return '';
-  if(v instanceof Date && !isNaN(v)){
-    const y=v.getFullYear(), m=String(v.getMonth()+1).padStart(2,'0'), d=String(v.getDate()).padStart(2,'0');
-    return y+'-'+m+'-'+d;
-  }
-  const s=String(v);
-  if(s.includes('T')) return s.slice(0,10);
-  if(s.includes('/') && s.length===10){
-    const p=s.split('/');
-    return p[2]+'-'+p[1]+'-'+p[0];
-  }
-  return s.slice(0,10);
-}
-
-// Valida que una fecha (YYYY-MM-DD) tenga un año razonable, para atrapar
-// errores de tipeo (ej: 2023 en vez de 2026) o relojes de sistema mal
-// configurados, ANTES de guardar la prefactura/consumo. Devuelve true si
-// la fecha es aceptable (el usuario la confirmó o está en rango normal).
-function validarFechaRazonable(fechaStr, etiqueta){
-  if(!fechaStr) return true; // campo vacío: que lo maneje la validación de "campo requerido" de cada formulario
-  const anio = parseInt(String(fechaStr).slice(0,4));
-  const anioActual = new Date().getFullYear();
-  if(isNaN(anio)) return true;
-  if(Math.abs(anio - anioActual) > 1){
-    return confirm('⚠ La fecha de '+etiqueta+' que ingresaste es '+fechaStr+', con año '+anio+'.\n\nEsto parece un error de tipeo (el año actual es '+anioActual+').\n\n¿Estás SEGURO de que esta fecha es correcta? Presiona Cancelar para corregirla.');
-  }
-  return true;
-}
-
 
 
 
@@ -716,14 +680,13 @@ function apiPost(data){
 async function cargarDatosCloud(){
   console.log('Cargando datos de la nube...');
   try {
-    const [cons, pfs, facts, clis, notasP, solF, conMan] = await Promise.all([
+    const [cons, pfs, facts, clis, notasP, solF] = await Promise.all([
       apiGet('getConsumos'),
       apiGet('getPrefacturas'),
       apiGet('getFacturas'),
       apiGet('getClientes'),
       apiGet('getNotasPedido'),
-      apiGet('getSolicitudesFacturacion'),
-      apiGet('getConsumoManual')
+      apiGet('getSolicitudesFacturacion')
     ]);
     // Limpiar arrays antes de cargar desde la nube (evitar duplicados)
     consumos.length = 0;
@@ -732,7 +695,6 @@ async function cargarDatosCloud(){
     clientes.length = 0;
     notasPedido.length = 0;
     solicitudesFacturacion.clear();
-    consumoManualMap.clear();
     // Cargar clientes desde el Sheet
     if(Array.isArray(clis)) clis.forEach(x=>{
       if(x.nombre) clientes.push({id:x.id||'',nombre:String(x.nombre).trim(),ruc:x.ruc||'',tel:x.tel||'',correo:x.correo||'',dir:x.dir||''});
@@ -745,17 +707,13 @@ async function cargarDatosCloud(){
     if(Array.isArray(solF)) solF.forEach(s=>{
       if(s.facturaId!==undefined && s.facturaId!=='') solicitudesFacturacion.add(String(s.facturaId));
     });
-    // Cargar el consumo "manual" fijado para la columna Consumo (no afecta saldos)
-    if(Array.isArray(conMan)) conMan.forEach(m=>{
-      if(m.npref!==undefined && m.npref!=='' && m.valor!==undefined && m.valor!=='') consumoManualMap.set(String(m.npref), parseInt(m.valor)||0);
-    });
 
 
 
     // Solo cargar registros NUEVOS (creados desde la app, no históricos del Excel)
     if(Array.isArray(cons)) cons.forEach(x=>{
       if(parseInt(x.id) >= 352)
-        consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:toISODate(x.fecha),obs:x.obs||''});
+        consumos.push({id:x.id,cliente:x.cliente,qty:parseInt(x.qty)||0,finca:x.finca||'R1',fecha:(x.fecha||'').toString().slice(0,10),obs:x.obs||''});
     });
     // Solo cargar prefacturas nuevas (PF#52 en adelante)
     if(Array.isArray(pfs)) pfs.forEach(p=>{
@@ -767,7 +725,7 @@ async function cargarDatosCloud(){
         if(!isNaN(pu) && pu > 100) pu = pu / 1000;
         if(isNaN(pu)||pu===0) pu=1.7217;
         if(pu>100) pu=pu/1000;
-        const estadoPF=(p.estado==='pendiente'||!p.estado)?'pendiente_pago':p.estado; prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:estadoPF,fecha:toISODate(p.fecha)});
+        const estadoPF=(p.estado==='pendiente'||!p.estado)?'pendiente_pago':p.estado; prefacturas.push({id:parseInt(p.id),cliente:p.cliente,qty:parseInt(p.qty)||0,servicio:p.servicio||'Almuerzo Operativo',precioUnit:pu,sub:parseNum(p.sub)||0,iva:parseNum(p.iva)||0,total:parseNum(p.total)||0,refPago:p.refPago||'',factura:p.factura||'',fechaPago:p.fechaPago||'',estado:estadoPF,fecha:p.fecha||''});
       }
     });
     // Cargar TODAS las facturas sin duplicar
@@ -807,7 +765,7 @@ async function cargarDatosCloud(){
           fTotal = parseFloat((fSub + fIva).toFixed(2));
         }
         // Limpiar fecha: eliminar parte de hora si viene como ISO (2026-06-18T05:00:00.000Z)
-        var fechaLimpia = toISODate(f.fecha);
+        var fechaLimpia = (f.fecha||'').toString().slice(0,10);
         // Limpiar comprobante: si contiene 'pendiente' o 'pagado' no es un comprobante real
         var comprobanteLimpio = String(f.comprobante||'');
         if(comprobanteLimpio.toLowerCase().includes('pendiente') || comprobanteLimpio.toLowerCase().includes('pagado')) comprobanteLimpio = '';
@@ -816,7 +774,6 @@ async function cargarDatosCloud(){
     });
     if(prefacturas.length>0){const maxPFid=Math.max(...prefacturas.map(p=>parseInt(p.id)||0));if(maxPFid>=nextPFid)nextPFid=maxPFid+1;}
     if(facturas.length>0){const maxFid=Math.max(...facturas.map(f=>parseInt(f.id)||0));if(maxFid>=nextFactId)nextFactId=maxFid+1;}
-    if(consumos.length>0){const maxConId=Math.max(...consumos.map(x=>parseInt(x.id)||0));if(maxConId>=nextCONid)nextCONid=maxConId+1;}
     const nprefEl=document.getElementById('p-npref');if(nprefEl)nprefEl.value=nextPFid;
     renderDash();
     renderControl();
@@ -946,11 +903,10 @@ async function registrarConsumo(){
   if(!n){alert("Selecciona un contratista");return;}
   const lineas=getLineas();
   if(!lineas.length){alert("Agrega al menos una finca");return;}
-  const fecha=document.getElementById("c-fecha").value;
-  if(!validarFechaRazonable(fecha, 'el consumo')) return;
   const total=lineas.reduce((a,l)=>a+l.qty,0);
   const saldo=getSaldo(n);
   if(total>saldo&&!confirm("⚠ Saldo insuficiente\nSaldo: "+saldo+" · Consumiendo: "+total+"\n\n¿Registrar de todas formas?")) return;
+  const fecha=document.getElementById("c-fecha").value;
   const obs=document.getElementById("c-obs").value;
 
   const btn = document.getElementById('btn-registrar-consumo');
@@ -1020,7 +976,6 @@ function irPS2(){
   const qty=parseInt(document.getElementById("p-qty").value)||0;
   if(!qty){alert("Ingresa la cantidad");return;}
   const fecha=document.getElementById("p-fecha").value;
-  if(!validarFechaRazonable(fecha, 'la prefactura')) return;
   const ref=document.getElementById("p-refpago").value;
   const servNombre=document.getElementById("p-servicio")?.value||"Almuerzo Operativo";
   const precioObj=PRECIOS_SERVICIOS[servNombre]||{neto:1.7217,iva:0.2583,total:1.98};
@@ -1041,68 +996,59 @@ function irPS2(){
 // la fecha de la prefactura/factura actual (inclusiva). Si no hay consumos
 // reales en ese rango, NO se asigna ninguna finca por defecto (antes se
 // forzaba todo a "R1", lo cual era incorrecto).
-// ── Asignación real de consumo vs. prefactura: modelo FIFO ────────────
-// En vez de adivinar una "ventana de fechas" para cada prefactura (que se
-// rompe si alguna fecha quedó mal escrita, como pasó con PF-53/54/64),
-// este modelo es inmune a errores de fecha: toma TODAS las prefacturas
-// del cliente en el orden en que se crearon (por id, que siempre es
-// correcto y consecutivo) y TODOS los consumos del cliente ordenados
-// cronológicamente, y va restando el consumo contra la prefactura más
-// antigua hasta agotar su cupo, pasando el sobrante a la siguiente.
-// Así, el total de consumo del cliente SIEMPRE se reparte completo entre
-// sus prefacturas, sin que ninguna pueda "perder" consumo por una fecha
-// mal escrita — a lo sumo, un consumo con fecha incorrecta puede quedar
-// mal ordenado dentro de la cola, pero nunca desaparece del cálculo.
-function getConsumoFIFOCliente(cliente){
-  // Usa TODAS las prefacturas del cliente (históricas + nuevas), tomadas
-  // de "facturas" (que sí carga el historial completo, a diferencia del
-  // array "prefacturas" que solo tiene las nuevas desde que existe la
-  // app). Se identifican por su número de prefactura (npref) y se
-  // ordenan por ese número — el orden real en que se crearon.
-  const vistos = new Set();
-  const pfs = [];
-  facturas.filter(f=>f.cliente===cliente && f.npref).forEach(f=>{
-    const key = String(f.npref);
-    if(vistos.has(key)) return;
-    vistos.add(key);
-    pfs.push({id:f.npref, qty:parseInt(f.qty)||0});
-  });
-  pfs.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
-
-  // Consumo real: TODO el historial (consumosHistoricos + consumos nuevos)
-  const cons = consumosHistoricos.concat(consumos).filter(x=>x.cliente===cliente).sort((a,b)=>{
-    const fa=toISODate(a.fecha), fb=toISODate(b.fecha);
-    if(fa!==fb) return fa<fb?-1:1;
-    return (parseInt(a.id)||0)-(parseInt(b.id)||0);
-  });
-  // "Desenrollar" cada consumo en unidades individuales (1 almuerzo c/u)
-  // etiquetadas con su finca, respetando el orden cronológico.
-  const unidades = [];
-  cons.forEach(c=>{ for(let i=0;i<c.qty;i++) unidades.push(c.finca||'R1'); });
-
-  let cursor = 0;
-  const resultado = {}; // npref de prefactura -> {porFinca, totalReal}
-  pfs.forEach(pf=>{
-    const porFinca = {};
-    let asignados = 0;
-    while(asignados < pf.qty && cursor < unidades.length){
-      const f = unidades[cursor];
-      porFinca[f] = (porFinca[f]||0)+1;
-      asignados++; cursor++;
+function getFincaBreakdown(cliente, fechaHasta, qtyTotal){
+  const todosC = consumosHistoricos.concat(consumos);
+  // Limpiar fechas con formato ISO (2026-06-01T05:00:00.000Z) a solo YYYY-MM-DD
+  const limpiarFecha = function(f){
+    if(!f) return '';
+    const s = String(f);
+    // Formato ISO: 2026-06-01T05:00:00.000Z
+    if(s.includes('T')) return s.slice(0,10);
+    // Formato DD/MM/YYYY: 18/06/2026
+    if(s.includes('/') && s.length===10){
+      const p=s.split('/');
+      return p[2]+'-'+p[1]+'-'+p[0];
     }
-    resultado[pf.id] = {porFinca, totalReal:asignados};
-  });
-  return resultado;
-}
+    // Formato YYYY-MM-DD: ya correcto
+    return s.slice(0,10);
+  };
+  const fHasta = limpiarFecha(fechaHasta);
+  const anteriores = facturas
+    .filter(x=>x.cliente===cliente && x.fecha && limpiarFecha(x.fecha) < fHasta)
+    .map(x=>limpiarFecha(x.fecha))
+    .sort();
+  const fechaDesde = anteriores.length ? anteriores[anteriores.length-1] : '0000-01-01';
 
-// Desglose por finca de UNA prefactura específica, identificada por su id
-// (antes se identificaba por fecha, lo cual era frágil ante errores de
-// tipeo). pfId debe ser el id de la prefactura (equivale a f.npref en el
-// objeto factura).
-function getFincaBreakdown(cliente, pfId){
-  const fifo = getConsumoFIFOCliente(cliente);
-  const entry = fifo[parseInt(pfId)];
-  return entry ? entry.porFinca : {};
+  // El "techo" real de la ventana NO es la fecha propia de la prefactura
+  // (esa suele ser el día en que se creó/pagó, y el consumo real casi
+  // siempre sigue después de esa fecha, porque se paga por adelantado).
+  // Si ya existe una factura POSTERIOR para este cliente, el techo real es
+  // la fecha de esa factura siguiente (exclusiva, para no duplicar consumos
+  // entre ventanas). Si esta es la última/actual prefactura del cliente, el
+  // techo se extiende hasta HOY para capturar todo el consumo ya registrado.
+  const siguientes = facturas
+    .filter(x=>x.cliente===cliente && x.fecha && limpiarFecha(x.fecha) > fHasta)
+    .map(x=>limpiarFecha(x.fecha))
+    .sort();
+  const hoy = new Date().toISOString().slice(0,10);
+  const esUltima = siguientes.length === 0;
+  // IMPORTANTE: solo se extiende el techo hasta HOY cuando esta es la ÚLTIMA
+  // prefactura del cliente (no tiene ninguna factura posterior todavía).
+  // Si NO es la última, se usa su propia fecha como techo (comportamiento
+  // original) porque la ventana de la siguiente factura ya empieza justo
+  // después de esa fecha — extenderla aquí duplicaría los mismos consumos
+  // en dos ventanas a la vez (ese fue el bug que causó "excede en 40" en PF-00053).
+  const techoReal = esUltima ? (hoy > fHasta ? hoy : fHasta) : fHasta;
+
+  const consFact = todosC.filter(x=>{
+    if(x.cliente!==cliente) return false;
+    const fx = limpiarFecha(x.fecha);
+    return fx > fechaDesde && fx <= techoReal;
+  });
+  const porFinca = {};
+  consFact.forEach(x=>{ const f=x.finca||'R1'; porFinca[f]=(porFinca[f]||0)+x.qty; });
+  // Mostrar consumos reales por finca sin ajustar al total de la prefactura
+  return porFinca;
 }
 
 function generarHTMLPF(pf, cl){
@@ -1362,27 +1308,6 @@ const notasPedido = [];
 // "Pendiente" en Control de Facturas.
 const solicitudesFacturacion = new Set();
 
-// Consumo "manual" mostrado en Control de Facturas: SOLO afecta lo que se
-// ve en pantalla en esa columna. No toca ningún registro de consumo real,
-// por lo tanto NUNCA afecta el saldo de Estado de Cuenta ni de Consumo
-// Diario. Se guarda por npref (número de prefactura) en su propia hoja.
-const consumoManualMap = new Map();
-
-async function editarConsumoManual(npref, qtyMax){
-  const actual = consumoManualMap.has(npref) ? consumoManualMap.get(npref) : '';
-  const entrada = prompt('¿Cuántos almuerzos quieres que se muestren como consumidos en PF-'+String(npref).padStart(5,'0')+' (de '+qtyMax+')?\n\nEsto SOLO cambia lo que se ve aquí — no afecta el saldo real del contratista.\n\nDeja el campo vacío y presiona Aceptar para quitar el valor manual y volver al cálculo automático.', actual);
-  if(entrada===null) return; // canceló
-  const valor = entrada.trim()==='' ? null : parseInt(entrada);
-  if(entrada.trim()!=='' && (isNaN(valor) || valor<0)){ alert('Ingresa un número válido (0 o más).'); return; }
-  try{
-    const r = await apiPost({action:'setConsumoManual', npref:npref, valor: valor===null ? '' : valor});
-    if(!r || r.error){ alert('No se pudo guardar: '+((r&&r.error)||'error desconocido')); return; }
-    if(valor===null) consumoManualMap.delete(npref);
-    else consumoManualMap.set(npref, valor);
-    renderControl();
-  }catch(e){ alert('Error de conexión al guardar.'); console.error(e); }
-}
-
 async function marcarSeleccionadasComoSolicitadas(selected){
   for(const f of selected){
     const idStr = String(f.id);
@@ -1536,7 +1461,7 @@ function calcFilaPF(f){
   } else if(String(f.npref) === '62'){
     porFinca = {'R4': 63};
   } else {
-    porFinca = getFincaBreakdown(f.cliente, f.npref||f.id, f.qty);
+    porFinca = getFincaBreakdown(f.cliente, f.fecha, f.qty);
   }
   const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0) || f.qty;
   const sub = parseFloat((totalReal * precioU).toFixed(4));
@@ -1587,7 +1512,7 @@ function generarPedido(){
   const errores = [];
   selected.forEach(function(f){
     if(['55','56','57','58','59','60','61','62'].includes(String(f.npref))) return;
-    const porFinca = getFincaBreakdown(f.cliente, f.npref||f.id, f.qty);
+    const porFinca = getFincaBreakdown(f.cliente, f.fecha, f.qty);
     const totalReal = Object.values(porFinca).reduce((a,b)=>a+b,0);
     if(totalReal < f.qty){
       errores.push('⚠ '+f.cliente+' (PF-'+String(f.npref||f.id).padStart(5,'0')+'): prepagados '+f.qty+' alm. · consumos registrados '+totalReal+' alm. · faltan '+(f.qty-totalReal)+' alm.');
@@ -1683,7 +1608,7 @@ function generarPedido(){
 
 function descargarPedidoExcel(){
   const selected = getSeleccionadas(); if(!selected) return;
-  const err2=[];selected.forEach(function(f){if(['55','56','57','58','59','60','61','62'].includes(String(f.npref))) return;const pf2=getFincaBreakdown(f.cliente,f.npref||f.id,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
+  const err2=[];selected.forEach(function(f){if(['55','56','57','58','59','60','61','62'].includes(String(f.npref))) return;const pf2=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr2=Object.values(pf2).reduce((a,b)=>a+b,0);if(tr2!==f.qty)err2.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr2);});if(err2.length&&!confirm('Consumos no cuadran:\n'+err2.join('\n')+'\n\n¿Continuar?')) return;
   marcarSeleccionadasComoSolicitadas(selected);
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
@@ -1767,7 +1692,7 @@ totRow.eachCell({includeEmpty:true},(cell,colNum)=>{
 }
 function descargarPedidoPDF(){
   const selected = getSeleccionadas(); if(!selected) return;
-  const err3=[];selected.forEach(function(f){const pf3=getFincaBreakdown(f.cliente,f.npref||f.id,f.qty);const tr3=Object.values(pf3).reduce((a,b)=>a+b,0);if(tr3!==f.qty)err3.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr3);});if(err3.length&&!confirm('Consumos no cuadran:\n'+err3.join('\n')+'\n\n¿Continuar?')) return;
+  const err3=[];selected.forEach(function(f){const pf3=getFincaBreakdown(f.cliente,f.fecha,f.qty);const tr3=Object.values(pf3).reduce((a,b)=>a+b,0);if(tr3!==f.qty)err3.push('PF-'+String(f.npref||f.id).padStart(5,'0')+': prepagados '+f.qty+', consumos '+tr3);});if(err3.length&&!confirm('Consumos no cuadran:\n'+err3.join('\n')+'\n\n¿Continuar?')) return;
   marcarSeleccionadasComoSolicitadas(selected);
   const hoy = new Date().toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'});
   const filas = selected.map(calcFilaPF);
