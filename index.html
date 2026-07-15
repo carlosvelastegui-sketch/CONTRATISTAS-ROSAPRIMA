@@ -1247,14 +1247,27 @@ function agregarFacturaPendiente(pf){
 }
 
 /* ── PEDIDO DE FACTURACIÓN ─────────────────────────────── */
-// Guarda, por cada prefactura (id), la fecha de registro en el sistema
-// contable y una nota/observación opcional que el usuario ingresa al
-// armar el pedido de facturación. No se envía a Google Sheets; vive solo
-// mientras se arma este pedido, y se imprime/exporta junto con el resto.
-const pedidoNotas = {};
+// La fecha de registro en el sistema y la nota/observación de cada
+// prefactura se guardan directamente en el objeto `factura` (propiedades
+// fechaRegistroPedido y notaPedido) y se persisten en la hoja "Facturas"
+// del Google Sheet mediante la acción 'updateNotaPedido'. Así quedan
+// guardadas aunque cierres o recargues la app.
 function getNotaPedido(facturaId){
-  if(!pedidoNotas[facturaId]) pedidoNotas[facturaId] = {fechaReg:'', nota:''};
-  return pedidoNotas[facturaId];
+  const f = facturas.find(x=>x.id===facturaId);
+  if(!f) return {fechaReg:'', nota:''};
+  return {fechaReg:f.fechaRegistroPedido||'', nota:f.notaPedido||''};
+}
+async function guardarNotaPedido(facturaId, campo, valor){
+  const f = facturas.find(x=>x.id===facturaId);
+  if(!f) return;
+  if(campo==='fechaReg') f.fechaRegistroPedido = valor;
+  if(campo==='nota') f.notaPedido = valor;
+  try{
+    const r = await apiPost({action:'updateNotaPedido', id:f.id, npref:f.npref||f.id, fechaRegistroPedido:f.fechaRegistroPedido||'', notaPedido:f.notaPedido||''});
+    if(!r || r.error){
+      console.error('No se pudo guardar la nota del pedido:', r && r.error);
+    }
+  }catch(e){ console.error('Error guardando nota del pedido:', e); }
 }
 const PRECIOS_PF = {
   "Almuerzo Operativo":        {neto:1.7217, iva:0.2583,  total:1.98},
@@ -1334,8 +1347,8 @@ function showPedidoFact(){
       +'<input type="checkbox" value="'+f.id+'" style="width:16px;height:16px"> '
       +'<span style="font-size:13px"><strong>PF-'+String(f.npref||f.id).padStart(5,"0")+'</strong> · '+f.cliente+' · '+f.qty+' alm. · '+fmt(f.total)+' · '+f.fecha+'</span>'
       +'</label>'
-      +'<input type="date" title="Fecha de registro en el sistema" value="'+(n.fechaReg||'')+'" onchange="getNotaPedido('+f.id+').fechaReg=this.value" style="font-size:12px;padding:5px 6px;border:1px solid #e2e6ed;border-radius:6px;color:#0f1c3f">'
-      +'<input type="text" placeholder="Nota / observación" value="'+(n.nota||'').replace(/"/g,"&quot;")+'" onchange="getNotaPedido('+f.id+').nota=this.value" style="font-size:12px;padding:5px 8px;border:1px solid #e2e6ed;border-radius:6px;flex:1;min-width:160px">'
+      +'<input type="date" title="Fecha de registro en el sistema" value="'+(n.fechaReg||'')+'" onchange="guardarNotaPedido('+f.id+',\'fechaReg\',this.value)" style="font-size:12px;padding:5px 6px;border:1px solid #e2e6ed;border-radius:6px;color:#0f1c3f">'
+      +'<input type="text" placeholder="Nota / observación" value="'+(n.nota||'').replace(/"/g,"&quot;")+'" onchange="guardarNotaPedido('+f.id+',\'nota\',this.value)" style="font-size:12px;padding:5px 8px;border:1px solid #e2e6ed;border-radius:6px;flex:1;min-width:160px">'
       +'</div>';
     }).join('');
   }
