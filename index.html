@@ -1247,6 +1247,15 @@ function agregarFacturaPendiente(pf){
 }
 
 /* ── PEDIDO DE FACTURACIÓN ─────────────────────────────── */
+// Guarda, por cada prefactura (id), la fecha de registro en el sistema
+// contable y una nota/observación opcional que el usuario ingresa al
+// armar el pedido de facturación. No se envía a Google Sheets; vive solo
+// mientras se arma este pedido, y se imprime/exporta junto con el resto.
+const pedidoNotas = {};
+function getNotaPedido(facturaId){
+  if(!pedidoNotas[facturaId]) pedidoNotas[facturaId] = {fechaReg:'', nota:''};
+  return pedidoNotas[facturaId];
+}
 const PRECIOS_PF = {
   "Almuerzo Operativo":        {neto:1.7217, iva:0.2583,  total:1.98},
   "Almuerzo Administrativo":   {neto:1.8261, iva:0.2739,  total:2.10},
@@ -1318,12 +1327,17 @@ function showPedidoFact(){
   if(!pendientes.length){
     selector.innerHTML='<div style="padding:12px;color:#94a3b8;text-align:center">No hay prefacturas pendientes de pago</div>';
   } else {
-    selector.innerHTML = pendientes.map(f=>
-      '<label style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;cursor:pointer">'
+    selector.innerHTML = pendientes.map(f=>{
+      const n = getNotaPedido(f.id);
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;border-bottom:1px solid #f0f2f5;flex-wrap:wrap">'
+      +'<label style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:260px">'
       +'<input type="checkbox" value="'+f.id+'" style="width:16px;height:16px"> '
-      +'<span style="flex:1;font-size:13px"><strong>PF-'+String(f.npref||f.id).padStart(5,"0")+'</strong> · '+f.cliente+' · '+f.qty+' alm. · '+fmt(f.total)+' · '+f.fecha+'</span>'
+      +'<span style="font-size:13px"><strong>PF-'+String(f.npref||f.id).padStart(5,"0")+'</strong> · '+f.cliente+' · '+f.qty+' alm. · '+fmt(f.total)+' · '+f.fecha+'</span>'
       +'</label>'
-    ).join('');
+      +'<input type="date" title="Fecha de registro en el sistema" value="'+(n.fechaReg||'')+'" onchange="getNotaPedido('+f.id+').fechaReg=this.value" style="font-size:12px;padding:5px 6px;border:1px solid #e2e6ed;border-radius:6px;color:#0f1c3f">'
+      +'<input type="text" placeholder="Nota / observación" value="'+(n.nota||'').replace(/"/g,"&quot;")+'" onchange="getNotaPedido('+f.id+').nota=this.value" style="font-size:12px;padding:5px 8px;border:1px solid #e2e6ed;border-radius:6px;flex:1;min-width:160px">'
+      +'</div>';
+    }).join('');
   }
   document.getElementById('modal-pedido-fact').classList.add('open');
 }
@@ -1391,6 +1405,8 @@ function generarPedido(){
           <th style="padding:8px 6px;text-align:center">R6</th>
           <th style="padding:8px 10px;text-align:left">Servicio</th>
           <th style="padding:8px 10px;text-align:left">N° Comprobante</th>
+          <th style="padding:8px 10px;text-align:left">Fecha Registro</th>
+          <th style="padding:8px 10px;text-align:left">Nota / Observación</th>
           <th style="padding:8px 10px;text-align:right">P. Neto</th>
           <th style="padding:8px 10px;text-align:right">Subtotal</th>
           <th style="padding:8px 10px;text-align:right">IVA 15%</th>
@@ -1414,6 +1430,8 @@ function generarPedido(){
           <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.f.comprobante||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${getNotaPedido(r.f.id).fechaReg||'—'}</td>
+          <td style="padding:8px 10px;color:#6b7694">${getNotaPedido(r.f.id).nota||'—'}</td>
           <td style="padding:8px 10px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:8px 10px;text-align:right">${fmt(r.iva)}</td>
@@ -1422,7 +1440,7 @@ function generarPedido(){
       </tbody>
       <tfoot>
         <tr style="background:#0f1c3f;color:white;font-weight:700">
-          <td colspan="15" style="padding:10px 12px;text-align:right">TOTALES</td>
+          <td colspan="17" style="padding:10px 12px;text-align:right">TOTALES</td>
           <td style="padding:10px;text-align:right">${fmt(totales.sub)}</td>
           <td style="padding:10px;text-align:right">${fmt(totales.iva)}</td>
           <td style="padding:10px;text-align:right">${fmt(totales.tot)}</td>
@@ -1444,15 +1462,15 @@ function descargarPedidoExcel(){
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Pedido Facturación');
  ws.views = [{state: 'normal', showGridLines: false}];
-  ws.columns = [{width:24},{width:14},{width:14},{width:13},{width:22},{width:7},{width:6},{width:6},{width:6},{width:6},{width:6},{width:6},{width:20},{width:16},{width:10},{width:11},{width:10},{width:11}];
+  ws.columns = [{width:24},{width:14},{width:14},{width:13},{width:22},{width:7},{width:6},{width:6},{width:6},{width:6},{width:6},{width:6},{width:20},{width:16},{width:14},{width:22},{width:10},{width:11},{width:10},{width:11}];
   const AZUL_DARK='0F1C3F',AZUL_MED='185FA5',AZUL_LIGHT='E6F1FB',BLANCO='FFFFFF',GRIS_T='6B7694';
   const mkBorder=color=>({top:{style:'thin',color:{argb:'FF'+color}},bottom:{style:'thin',color:{argb:'FF'+color}},left:{style:'thin',color:{argb:'FF'+color}},right:{style:'thin',color:{argb:'FF'+color}}});
   // Fila 1 espaciado
   ws.addRow([]); ws.getRow(1).height=6;
   // Fila 2 título
   const r2=ws.addRow(['HANASKA (Rosaprima)  —  PEDIDO DE FACTURACIÓN']); r2.height=28;
-  ws.mergeCells('A2:R2');
-  for(let i=1;i<=18;i++){const cell=r2.getCell(i);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:14,bold:true,color:{argb:'FF'+BLANCO}};if(i===1)cell.alignment={horizontal:'left',vertical:'middle'};}
+  ws.mergeCells('A2:T2');
+  for(let i=1;i<=20;i++){const cell=r2.getCell(i);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:14,bold:true,color:{argb:'FF'+BLANCO}};if(i===1)cell.alignment={horizontal:'left',vertical:'middle'};}
   // Fila 3 espaciado
   ws.addRow([]); ws.getRow(3).height=6;
   // Fila 4 fecha
@@ -1462,44 +1480,45 @@ function descargarPedidoExcel(){
   ws.getCell('B4').font={name:'Arial',size:10,color:{argb:'FF1A1A2E'}};
   // Fila 5 separador
   const r5=ws.addRow([]); r5.height=4;
-  for(let i=1;i<=18;i++) r5.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
+  for(let i=1;i<=20;i++) r5.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
   // Fila 6 espaciado
   ws.addRow([]); ws.getRow(6).height=6;
   // Fila 7 headers
- const hdrs=['Razón Social','RUC','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','Nº Comprobante','P. Neto','Subtotal','IVA 15%','Total'];
+ const hdrs=['Razón Social','RUC','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','Nº Comprobante','Fecha Registro','Nota / Observación','P. Neto','Subtotal','IVA 15%','Total'];
   const r7=ws.addRow(hdrs); r7.height=22;
   r7.eachCell(cell=>{cell.font={name:'Arial',size:9,bold:true,color:{argb:'FF'+BLANCO}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};cell.border=mkBorder('0D4E8A');});
   ws.getRow(7).getCell(1).alignment={horizontal:'left',vertical:'middle'};
   // Filas datos
-  const numCols=new Set([6,7,8,9,10,11,12,15,16,17,18]);
+  const numCols=new Set([6,7,8,9,10,11,12,17,18,19,20]);
   filas.forEach(r=>{
-    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',r.precioU,r.sub,r.iva,r.tot]);
+    const n=getNotaPedido(r.f.id);
+    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',n.fechaReg||'',n.nota||'',r.precioU,r.sub,r.iva,r.tot]);
     row.height=18;
     row.eachCell({includeEmpty:true},(cell,colNum)=>{
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_LIGHT}};
       cell.border=mkBorder('B5D4F4');
       cell.font={name:'Arial',size:9,color:{argb:'FF1A1A2E'}};
-      if(numCols.has(colNum)){cell.alignment={horizontal:colNum>=14?'right':'center',vertical:'middle'};if(colNum>=14)cell.numFmt='#,##0.0000';}
+      if(numCols.has(colNum)){cell.alignment={horizontal:colNum>=17?'right':'center',vertical:'middle'};if(colNum>=17)cell.numFmt='#,##0.0000';}
       else{cell.alignment={horizontal:'left',vertical:'middle'};}
     });
   });
   // Fila totales
   const lastRow=7+filas.length;
-  const totRow=ws.addRow(['TOTALES','','','','','','','','','','','','','','',totales.sub,totales.iva,totales.tot]);
+  const totRow=ws.addRow(['TOTALES','','','','','','','','','','','','','','','','',totales.sub,totales.iva,totales.tot]);
 totRow.height=18;
-ws.mergeCells('A'+(lastRow+1)+':P'+(lastRow+1));
+ws.mergeCells('A'+(lastRow+1)+':R'+(lastRow+1));
 totRow.eachCell({includeEmpty:true},(cell,colNum)=>{
   cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};
   cell.font={name:'Arial',size:9,bold:true,color:{argb:'FF'+BLANCO}};
   cell.border=mkBorder(AZUL_DARK);
-  if(colNum>=16) cell.numFmt='#,##0.0000';
+  if(colNum>=18) cell.numFmt='#,##0.0000';
   cell.alignment={horizontal:'right',vertical:'middle'};
 });  // Separador inferior
   const rSep=ws.addRow([]); rSep.height=4;
-  for(let i=1;i<=18;i++) rSep.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
+  for(let i=1;i<=20;i++) rSep.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
   // Pie
   const rPie=ws.addRow(['TECFOOD SERVICIOS DE ALIMENTACION S.A.  |  RUC: 1792065461001  |  Cayambe, Pichincha']); rPie.height=14;
-  ws.mergeCells('A'+(lastRow+3)+':R'+(lastRow+3));
+  ws.mergeCells('A'+(lastRow+3)+':T'+(lastRow+3));
   rPie.getCell(1).font={name:'Arial',size:8,italic:true,color:{argb:'FF'+GRIS_T}};
   rPie.getCell(1).alignment={horizontal:'center',vertical:'middle'};
   wb.xlsx.writeBuffer().then(buffer=>{
@@ -1546,6 +1565,8 @@ function descargarPedidoPDF(){
           <th style="padding:7px 4px;text-align:center">R5</th>
           <th style="padding:7px 4px;text-align:center">R6</th>
           <th style="padding:7px 8px;text-align:left">Servicio</th>
+          <th style="padding:7px 8px;text-align:left">Fecha Registro</th>
+          <th style="padding:7px 8px;text-align:left">Nota / Observación</th>
           <th style="padding:7px 8px;text-align:right">P. Neto</th>
           <th style="padding:7px 8px;text-align:right">Subtotal</th>
           <th style="padding:7px 8px;text-align:right">IVA 15%</th>
@@ -1568,6 +1589,8 @@ function descargarPedidoPDF(){
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R5']||''}</td>
           <td style="padding:7px 4px;text-align:center">${r.porFinca['R6']||''}</td>
           <td style="padding:7px 8px">${r.f.servicio||'Almuerzo Operativo'}</td>
+          <td style="padding:7px 8px;color:#555">${getNotaPedido(r.f.id).fechaReg||'—'}</td>
+          <td style="padding:7px 8px;color:#555">${getNotaPedido(r.f.id).nota||'—'}</td>
           <td style="padding:7px 8px;text-align:right">$${r.precioU.toFixed(4).replace('.',',')}</td>
           <td style="padding:7px 8px;text-align:right">${fmt(r.sub)}</td>
           <td style="padding:7px 8px;text-align:right">${fmt(r.iva)}</td>
@@ -1576,7 +1599,7 @@ function descargarPedidoPDF(){
       </tbody>
       <tfoot>
         <tr style="background:#0f1c3f;color:white;font-weight:700">
-          <td colspan="14" style="padding:8px 10px;text-align:right">TOTALES</td>
+          <td colspan="16" style="padding:8px 10px;text-align:right">TOTALES</td>
           <td style="padding:8px;text-align:right">${fmt(totales.sub)}</td>
           <td style="padding:8px;text-align:right">${fmt(totales.iva)}</td>
           <td style="padding:8px;text-align:right">${fmt(totales.tot)}</td>
