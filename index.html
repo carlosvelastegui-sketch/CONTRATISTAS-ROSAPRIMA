@@ -1049,8 +1049,23 @@ function irPS2(){
 // mal escrita — a lo sumo, un consumo con fecha incorrecta puede quedar
 // mal ordenado dentro de la cola, pero nunca desaparece del cálculo.
 function getConsumoFIFOCliente(cliente){
-  const pfs = prefacturas.filter(p=>p.cliente===cliente).sort((a,b)=>parseInt(a.id)-parseInt(b.id));
-  const cons = consumos.filter(x=>x.cliente===cliente).sort((a,b)=>{
+  // Usa TODAS las prefacturas del cliente (históricas + nuevas), tomadas
+  // de "facturas" (que sí carga el historial completo, a diferencia del
+  // array "prefacturas" que solo tiene las nuevas desde que existe la
+  // app). Se identifican por su número de prefactura (npref) y se
+  // ordenan por ese número — el orden real en que se crearon.
+  const vistos = new Set();
+  const pfs = [];
+  facturas.filter(f=>f.cliente===cliente && f.npref).forEach(f=>{
+    const key = String(f.npref);
+    if(vistos.has(key)) return;
+    vistos.add(key);
+    pfs.push({id:f.npref, qty:parseInt(f.qty)||0});
+  });
+  pfs.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
+
+  // Consumo real: TODO el historial (consumosHistoricos + consumos nuevos)
+  const cons = consumosHistoricos.concat(consumos).filter(x=>x.cliente===cliente).sort((a,b)=>{
     const fa=toISODate(a.fecha), fb=toISODate(b.fecha);
     if(fa!==fb) return fa<fb?-1:1;
     return (parseInt(a.id)||0)-(parseInt(b.id)||0);
@@ -1061,19 +1076,8 @@ function getConsumoFIFOCliente(cliente){
   cons.forEach(c=>{ for(let i=0;i<c.qty;i++) unidades.push(c.finca||'R1'); });
 
   let cursor = 0;
-  const resultado = {}; // id de prefactura -> {porFinca, totalReal}
+  const resultado = {}; // npref de prefactura -> {porFinca, totalReal}
   pfs.forEach(pf=>{
-    // Una prefactura ya PAGADA se da por completamente cerrada, sin
-    // importar si el consumo real llegó exacto a su cupo. Así no se queda
-    // "atajando" el consumo real y bloqueando que fluya hacia la
-    // siguiente prefactura (esto fue lo que pasó con PF-62 de Efrain
-    // Imbaquingo bloqueando el consumo de PF-63).
-    const facturaDePF = facturas.find(f=>String(f.npref)===String(pf.id));
-    const yaPagada = facturaDePF && facturaDePF.estado==='pagado';
-    if(yaPagada){
-      resultado[pf.id] = {porFinca:{}, totalReal:pf.qty};
-      return;
-    }
     const porFinca = {};
     let asignados = 0;
     while(asignados < pf.qty && cursor < unidades.length){
