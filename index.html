@@ -1141,7 +1141,7 @@ function renderControl(){
 +'<td>'+(isPaid
   ?'<span class="badge badge-ok">Pagado</span>'
   :'<span class="badge badge-pending">Pendiente</span>')+'</td>'
-+'<td>'+(isPaid?'':'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')+' <button class="btn btn-sm" title="Bitácora de registro" onclick="abrirBitacora('+x.id+')"><i class="ti ti-notes"></i></button>'+'</td>'
++'<td>'+(isPaid?'':'<button class="btn btn-primary btn-sm" onclick="abrirModalPago('+x.id+')"><i class="ti ti-cash"></i> Registrar pago</button>')+' <span style="position:relative;display:inline-block"><button class="btn btn-sm" title="Bitácora de registro" onclick="abrirBitacora('+x.id+')"><i class="ti ti-notes"></i></button>'+(getNotasPedidoDe(x.id).length?'<span style="position:absolute;top:-6px;right:-6px;background:#185FA5;color:white;border-radius:999px;min-width:16px;height:16px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1">'+getNotasPedidoDe(x.id).length+'</span>':'')+'</span>'+'</td>'
 +'</td>'+'</tr>';
   }).join("");
 }
@@ -1337,6 +1337,7 @@ async function agregarEntradaBitacora(){
     document.getElementById('mnota-texto').value = '';
     renderListaBitacora();
     renderPedidoSelectorResumen();
+    if(document.getElementById('ctrl-table')) renderControl();
   }catch(e){ alert('Error de conexión al guardar la entrada.'); console.error(e); }
 }
 
@@ -1349,6 +1350,7 @@ async function eliminarEntradaBitacora(id){
     if(idx>=0) notasPedido.splice(idx,1);
     renderListaBitacora();
     renderPedidoSelectorResumen();
+    if(document.getElementById('ctrl-table')) renderControl();
   }catch(e){ alert('Error de conexión al eliminar.'); console.error(e); }
 }
 
