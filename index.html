@@ -821,10 +821,11 @@ async function cargarDatosCloud(){
     });
     if(prefacturas.length>0){const maxPFid=Math.max(...prefacturas.map(p=>parseInt(p.id)||0));if(maxPFid>=nextPFid)nextPFid=maxPFid+1;}
     if(facturas.length>0){const maxFid=Math.max(...facturas.map(f=>parseInt(f.id)||0));if(maxFid>=nextFactId)nextFactId=maxFid+1;}
+    if(consumos.length>0){const maxConId=Math.max(...consumos.map(c=>parseInt(c.id)||0));if(maxConId>=nextCONid)nextCONid=maxConId+1;}
     const nprefEl=document.getElementById('p-npref');if(nprefEl)nprefEl.value=nextPFid;
     renderDash();
     renderControl();
-    console.log('✓ Datos cargados. Próximo PF#:', nextPFid, '| Próxima Factura ID:', nextFactId);
+    console.log('✓ Datos cargados. Próximo PF#:', nextPFid, '| Próxima Factura ID:', nextFactId, '| Próximo Consumo ID:', nextCONid);
   } catch(e) {
     console.error('Error cargando datos:', e);
   }
