@@ -1089,6 +1089,18 @@ function getConsumoFIFOCliente(cliente){
     vistos.add(key);
     pfs.push({id:f.npref, qty:parseInt(f.qty)||0, fecha:toISODate(f.fecha), estado:f.estado});
   });
+  // AJUSTES DE CUADRE FIFO: registros que viven SOLO en la hoja "Prefacturas"
+  // (estado === 'ajuste'), NUNCA en "Facturas". Sirven para reconocer, dentro
+  // del cálculo, consumo real de un período viejo que quedó fuera del cupo de
+  // una prefactura ya pagada — sin generar ninguna factura nueva ni tocar el
+  // historial de facturación. No aparecen en "Control facturas" ni se pueden
+  // seleccionar para un pedido, porque esa pantalla solo lee de "facturas".
+  prefacturas.filter(p=>p.cliente===cliente && p.estado==='ajuste').forEach(p=>{
+    const key = String(p.id);
+    if(vistos.has(key)) return;
+    vistos.add(key);
+    pfs.push({id:p.id, qty:parseInt(p.qty)||0, fecha:toISODate(p.fecha), estado:'ajuste'});
+  });
   pfs.sort((a,b)=>parseInt(a.id)-parseInt(b.id));
 
   // Si el cliente NO tiene ninguna prefactura histórica itemizada (npref
@@ -1104,31 +1116,78 @@ function getConsumoFIFOCliente(cliente){
   });
 
   const resultado = {};
-  pfs.forEach(pf=>{
-    // Una prefactura ya PAGADA se da por completamente cerrada, sin
-    // importar si el consumo real llegó exacto a su cupo — ya se facturó
-    // y cobró, así que no debe seguir "reservando" cupo indefinidamente.
-    if(pf.estado === 'pagado'){
-      resultado[pf.id] = {porFinca:{}, totalReal: pf.qty};
-      return;
-    }
-    // Prefactura PENDIENTE: el consumo que le corresponde es el real
-    // registrado DESDE la propia fecha de la prefactura en adelante,
-    // hasta llenar su cupo (no depende de ninguna otra prefactura).
-    const porFinca = {};
-    let asignados = 0;
-    for(const c of cons){
-      if(asignados >= pf.qty) break;
-      if(toISODate(c.fecha) < pf.fecha) continue;
-      const restante = pf.qty - asignados;
-      const tomar = Math.min(c.qty, restante);
-      const f = c.finca || 'R1';
-      porFinca[f] = (porFinca[f]||0) + tomar;
-      asignados += tomar;
-    }
-    resultado[pf.id] = {porFinca, totalReal:asignados};
+
+  // 1) Prefacturas PAGADAS y AJUSTES: se dan por completamente cerrados —
+  //    las pagadas porque ya se facturaron y cobraron, y los ajustes porque
+  //    representan consumo que YA ocurrió y solo se está reconociendo
+  //    retroactivamente el cupo que le corresponde. Ninguno de los dos debe
+  //    reabrirse ni "reservar" cupo indefinidamente.
+  pfs.filter(pf=>pf.estado==='pagado' || pf.estado==='ajuste').forEach(pf=>{
+    resultado[pf.id] = {porFinca:{}, totalReal: pf.qty, estado:pf.estado};
   });
+
+  // 2) Prefacturas PENDIENTES: FIFO encadenado SOLO entre ellas. Antes,
+  //    cada pendiente se calculaba de forma independiente (reiniciando el
+  //    conteo de consumos desde cero cada vez), lo que permitía que un
+  //    mismo consumo diario quedara asignado a MÁS DE UNA prefactura
+  //    pendiente al mismo tiempo si había varias abiertas a la vez. Ahora
+  //    un solo puntero recorre los consumos desde la fecha de la primera
+  //    pendiente, y cada consumo se asigna una sola vez: si sobra después
+  //    de llenar una pendiente, el excedente pasa a la siguiente pendiente
+  //    en la secuencia (nunca a una ya pagada ni a un ajuste).
+  const pendientes = pfs.filter(pf=>pf.estado!=='pagado' && pf.estado!=='ajuste');
+  if(pendientes.length){
+    const desde = pendientes[0].fecha;
+    const consPend = cons.filter(c=>toISODate(c.fecha) >= desde);
+    let idx = 0;
+    let restanteEnRegistro = consPend.length ? consPend[0].qty : 0;
+    pendientes.forEach(pf=>{
+      const porFinca = {};
+      let asignados = 0;
+      while(asignados < pf.qty && idx < consPend.length){
+        const c = consPend[idx];
+        const restanteCupo = pf.qty - asignados;
+        const tomar = Math.min(restanteEnRegistro, restanteCupo);
+        const f = c.finca || 'R1';
+        porFinca[f] = (porFinca[f]||0) + tomar;
+        asignados += tomar;
+        restanteEnRegistro -= tomar;
+        if(restanteEnRegistro <= 0){
+          idx++;
+          restanteEnRegistro = idx < consPend.length ? consPend[idx].qty : 0;
+        }
+      }
+      resultado[pf.id] = {porFinca, totalReal:asignados, estado:pf.estado};
+    });
+  }
+
   return resultado;
+}
+
+// Saldo "disponible" real de un cliente, usando el MISMO cálculo FIFO que
+// Petición de facturación — para que Estado de cuentas muestre siempre el
+// mismo número que "faltan X" en la validación de facturación. A propósito
+// NO es el saldo histórico completo (eso lo sigue dando getSaldo): este
+// valor solo mira la(s) prefactura(s) PENDIENTES actuales, que es lo que
+// realmente le queda disponible al cliente para seguir consumiendo hoy.
+// Las prefacturas pagadas y los ajustes de cuadre FIFO ya están cerrados y
+// no aportan ni restan aquí (su historial se sigue viendo en la tabla de
+// "Últimas prefacturas", solo que ya no inflan ni desinflan este número).
+function getSaldoDisponibleFIFO(cliente){
+  const fifo = getConsumoFIFOCliente(cliente);
+  let disponible = 0;
+  let tienePendiente = false;
+  Object.keys(fifo).forEach(id=>{
+    const entry = fifo[id];
+    if(entry.estado==='pagado' || entry.estado==='ajuste') return;
+    tienePendiente = true;
+    // qty real de esa prefactura pendiente (buscarla en las prefacturas cargadas)
+    const pfMatch = prefacturas.find(p=>String(p.id)===String(id) && p.cliente===cliente)
+                 || facturas.find(f=>String(f.npref)===String(id) && f.cliente===cliente);
+    const qty = pfMatch ? parseInt(pfMatch.qty)||0 : entry.totalReal;
+    disponible += (qty - entry.totalReal);
+  });
+  return {disponible, tienePendiente};
 }
 
 // Desglose por finca de UNA prefactura específica, identificada por su id
@@ -1870,7 +1929,12 @@ function renderCuentas(){
   const listaClientes = filtroCliente ? clientes.filter(c=>c.nombre===filtroCliente) : clientes;
 
   document.getElementById("cuentas-wrap").innerHTML=(listaClientes.length? listaClientes.map(c=>{
-    const saldo=getSaldo(c.nombre);
+    // Saldo "disponible" = mismo cálculo FIFO que Petición de facturación,
+    // mirando solo la(s) prefactura(s) pendientes actuales (no el histórico
+    // completo). El saldo histórico neto de toda la vida sigue disponible
+    // en getSaldo(c.nombre) por si se necesita para otro reporte.
+    const {disponible: saldo, tienePendiente} = getSaldoDisponibleFIFO(c.nombre);
+    const saldoHistorico = getSaldo(c.nombre);
     // Combinar históricos + nuevos para mostrar en estado de cuenta
     const allCons = consumosHistoricos.filter(x=>x.cliente===c.nombre).concat(consumos.filter(x=>x.cliente===c.nombre));
     const allPFs  = prefacturas.filter(p=>p.cliente===c.nombre);
@@ -1878,8 +1942,27 @@ function renderCuentas(){
     const con=allCons.reduce((a,x)=>a+x.qty,0);
     const pct=Math.min(100,Math.max(0,Math.round((con/(con+Math.max(saldo,0)||1))*100)));
     const histP=allPFs.slice(-5).reverse();
+    // Mismo cálculo FIFO que usa "Petición de facturación" (generarPedido),
+    // para que Estado de cuentas y la validación de facturación SIEMPRE
+    // muestren el mismo número de "faltan"/"excede" por prefactura.
+    const fifoCliente = getConsumoFIFOCliente(c.nombre);
     const histC=allCons.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,cantMostrar);
-    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+(saldo>20?"badge-ok":saldo>0?"badge-pending":"badge-red")+'">'+saldo+' alm. disponibles</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7694;margin-bottom:6px"><span>Saldo actual: <strong>'+saldo+'</strong> alm.</span><span>'+pct+'% consumido</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldo>20?"#3B6D11":saldo>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th></tr></thead><tbody>'+histP.map(function(p){const ok=facturas.some(function(f){return String(f.npref)===String(p.id)&&f.factura&&f.factura.trim()!==''&&f.estado==='pagado';})||(p.estado==='pagado');return '<tr><td style="padding:5px 8px;font-weight:600;color:#3B6D11">+'+p.qty+'</td><td style="padding:5px 8px;color:#6b7694">'+p.fecha.toString().slice(0,10)+'</td><td style="padding:5px 8px"><span class="badge '+(ok?"badge-ok":"badge-pending")+'" style="font-size:10px">'+(ok?"Pagado":"Pend.")+'</span></td></tr>'; }).join("")+'</tbody></table></div><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimos consumos ('+histC.length+' de '+allCons.length+')</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Finca</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th></tr></thead><tbody>'+(histC.length?histC.map(x=>'<tr><td style="padding:5px 8px;color:#6b7694">'+x.fecha+'</td><td style="padding:5px 8px">'+fb(x.finca||"R1")+'</td><td style="padding:5px 8px;font-weight:600;color:#A32D2D">-'+x.qty+'</td></tr>').join(""):'<tr><td colspan="3" style="padding:10px 8px;color:#6b7694;text-align:center">Sin consumos</td></tr>')+'</tbody></table></div></div></div>';
+    const badgeTxt = tienePendiente ? (saldo+' alm. disponibles') : (saldoHistorico<0 ? ('Deuda histórica: '+saldoHistorico+' alm.') : 'Sin prefactura pendiente');
+    const badgeClase = tienePendiente ? (saldo>20?"badge-ok":saldo>0?"badge-pending":"badge-red") : (saldoHistorico<0?"badge-red":"badge-pending");
+    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+badgeClase+'">'+badgeTxt+'</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7694;margin-bottom:6px"><span>Saldo actual: <strong>'+(tienePendiente?saldo:saldoHistorico)+'</strong> alm.'+(tienePendiente?'':' (sin prefactura pendiente'+(saldoHistorico<0?' — deuda del histórico, hay que crear una prefactura para cobrarla':'')+')')+'</span><span>'+pct+'% consumido</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldo>20?"#3B6D11":saldo>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Consumo real</th></tr></thead><tbody>'+histP.map(function(p){const ok=facturas.some(function(f){return String(f.npref)===String(p.id)&&f.factura&&f.factura.trim()!==''&&f.estado==='pagado';})||(p.estado==='pagado');
+      const fEntry = fifoCliente[parseInt(p.id)] || fifoCliente[p.id];
+      let consumoTxt = '<span style="color:#6b7694">—</span>';
+      if(fEntry){
+        const diff = fEntry.totalReal - p.qty;
+        if(diff===0) consumoTxt = '<span style="color:#3B6D11;font-weight:600">'+fEntry.totalReal+'/'+p.qty+' &#10003;</span>';
+        else if(diff<0) consumoTxt = '<span style="color:#854F0B;font-weight:600">'+fEntry.totalReal+'/'+p.qty+' (faltan '+(-diff)+')</span>';
+        else consumoTxt = '<span style="color:#A32D2D;font-weight:600">'+fEntry.totalReal+'/'+p.qty+' (excede '+diff+')</span>';
+      }
+      const esAjuste = p.estado==='ajuste';
+      const badgeTxt = esAjuste?"Ajuste":(ok?"Pagado":"Pend.");
+      const badgeClase = esAjuste?"badge-info":(ok?"badge-ok":"badge-pending");
+      const badgeTitle = esAjuste?"Ajuste de cuadre FIFO, no es una factura":"";
+      return '<tr><td style="padding:5px 8px;font-weight:600;color:#3B6D11">+'+p.qty+'</td><td style="padding:5px 8px;color:#6b7694">'+p.fecha.toString().slice(0,10)+'</td><td style="padding:5px 8px"><span class="badge '+badgeClase+'" style="font-size:10px" title="'+badgeTitle+'">'+badgeTxt+'</span></td><td style="padding:5px 8px;font-size:11px">'+consumoTxt+'</td></tr>'; }).join("")+'</tbody></table></div><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimos consumos ('+histC.length+' de '+allCons.length+')</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Finca</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th></tr></thead><tbody>'+(histC.length?histC.map(x=>'<tr><td style="padding:5px 8px;color:#6b7694">'+x.fecha+'</td><td style="padding:5px 8px">'+fb(x.finca||"R1")+'</td><td style="padding:5px 8px;font-weight:600;color:#A32D2D">-'+x.qty+'</td></tr>').join(""):'<tr><td colspan="3" style="padding:10px 8px;color:#6b7694;text-align:center">Sin consumos</td></tr>')+'</tbody></table></div></div></div>';
   }).join("") : '<div style="padding:20px;color:#94a3b8;text-align:center">No hay contratistas para ese filtro</div>');
 }
 
