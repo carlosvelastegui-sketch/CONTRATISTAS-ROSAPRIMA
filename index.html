@@ -1947,9 +1947,9 @@ function renderCuentas(){
     // muestren el mismo número de "faltan"/"excede" por prefactura.
     const fifoCliente = getConsumoFIFOCliente(c.nombre);
     const histC=allCons.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,cantMostrar);
-    const badgeTxt = tienePendiente ? (saldo+' alm. disponibles') : (saldoHistorico<0 ? ('Deuda histórica: '+saldoHistorico+' alm.') : 'Sin prefactura pendiente');
-    const badgeClase = tienePendiente ? (saldo>20?"badge-ok":saldo>0?"badge-pending":"badge-red") : (saldoHistorico<0?"badge-red":"badge-pending");
-    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+badgeClase+'">'+badgeTxt+'</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:12px;color:#6b7694;margin-bottom:6px"><span>Saldo actual: <strong>'+(tienePendiente?saldo:saldoHistorico)+'</strong> alm.'+(tienePendiente?'':' (sin prefactura pendiente'+(saldoHistorico<0?' — deuda del histórico, hay que crear una prefactura para cobrarla':'')+')')+'</span><span>'+pct+'% consumido</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldo>20?"#3B6D11":saldo>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Consumo real</th></tr></thead><tbody>'+histP.map(function(p){const ok=facturas.some(function(f){return String(f.npref)===String(p.id)&&f.factura&&f.factura.trim()!==''&&f.estado==='pagado';})||(p.estado==='pagado');
+    const saldoMostrado = tienePendiente ? saldo : saldoHistorico;
+    const badgeClase = saldoMostrado>20?"badge-ok":saldoMostrado>0?"badge-pending":saldoMostrado===0?"badge-pending":"badge-red";
+    return '<div class="card"><div class="card-header"><span class="card-title">'+c.nombre+'</span><span class="badge '+badgeClase+'" style="font-size:18px;padding:5px 16px;font-weight:700">'+saldoMostrado+' alm.</span></div><div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-size:12px;color:#6b7694">Saldo actual</span><span style="font-size:12px;color:#6b7694">'+pct+'% consumido</span></div><div style="font-size:32px;font-weight:700;color:'+(saldoMostrado>20?"#3B6D11":saldoMostrado>0?"#854F0B":saldoMostrado===0?"#6b7694":"#A32D2D")+';margin-bottom:8px">'+saldoMostrado+' <span style="font-size:16px;font-weight:600">alm.</span></div><div style="background:#f0f2f5;border-radius:6px;height:10px;overflow:hidden"><div style="width:'+Math.min(pct,100)+'%;background:'+(saldoMostrado>20?"#3B6D11":saldoMostrado>0?"#854F0B":"#A32D2D")+';height:100%;border-radius:6px"></div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><div style="font-size:11px;font-weight:600;color:#6b7694;text-transform:uppercase;margin-bottom:8px">Últimas prefacturas</div><table style="font-size:12px"><thead><tr><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Alm.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fecha</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Fact.</th><th style="padding:5px 8px;background:#f8f9fb;border-bottom:1px solid #e2e6ed">Consumo real</th></tr></thead><tbody>'+histP.map(function(p){const ok=facturas.some(function(f){return String(f.npref)===String(p.id)&&f.factura&&f.factura.trim()!==''&&f.estado==='pagado';})||(p.estado==='pagado');
       const fEntry = fifoCliente[parseInt(p.id)] || fifoCliente[p.id];
       let consumoTxt = '<span style="color:#6b7694">—</span>';
       if(fEntry){
@@ -2275,9 +2275,19 @@ function exportarReportePagos(){
   area.style.display="none";
 }
 
+// Mismo número que se ve en el badge de Estado de cuentas: si el cliente
+// tiene prefactura pendiente, el disponible por FIFO; si no, el saldo
+// histórico (puede ser negativo = deuda, positivo/cero = sin nada pendiente).
+// Se usa aquí y en Dashboard/Contratistas para que TODA la app muestre
+// siempre el mismo número por cliente.
+function getSaldoMostrado(nombre){
+  const {disponible, tienePendiente} = getSaldoDisponibleFIFO(nombre);
+  return tienePendiente ? disponible : getSaldo(nombre);
+}
+
 /* DASHBOARD */
 function renderDash(){
-  const saldos=clientes.map(c=>getSaldo(c.nombre));
+  const saldos=clientes.map(c=>getSaldoMostrado(c.nombre));
   const sumPos=saldos.filter(s=>s>0).reduce((a,s)=>a+s,0);
   const sumNeg=Math.abs(saldos.filter(s=>s<0).reduce((a,s)=>a+s,0));
   const cntNeg=saldos.filter(s=>s<0).length;
@@ -2286,11 +2296,11 @@ function renderDash(){
   document.getElementById("m-saldo").textContent=sumPos+' alm.';
   document.getElementById("m-neg").textContent=cntNeg+' ('+sumNeg+' alm.)';
   document.getElementById("m-pend").textContent=pend;
-  const maxS=Math.max(...clientes.map(c=>Math.abs(getSaldo(c.nombre))),1);
+  const maxS=Math.max(...clientes.map(c=>Math.abs(getSaldoMostrado(c.nombre))),1);
   document.getElementById("dash-saldos").innerHTML=clientes.map(c=>{
-    const s=getSaldo(c.nombre);
+    const s=getSaldoMostrado(c.nombre);
     const col=s>20?"#3B6D11":s>0?"#854F0B":"#A32D2D";
-    return '<div class="bar-row"><div class="bar-name" title="'+c.nombre+'">'+sh(c.nombre,20)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(Math.abs(s)/maxS*100).toFixed(1)+'%;background:'+col+'"></div></div><div class="bar-val" style="color:'+col+'">'+s+' alm.</div></div>';
+    return '<div class="bar-row"><div class="bar-name" title="'+c.nombre+'">'+sh(c.nombre,20)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+(Math.abs(s)/maxS*100).toFixed(1)+'%;background:'+col+'"></div></div><div class="bar-val" style="color:'+col+';font-size:17px;font-weight:700;width:110px">'+s+' alm.</div></div>';
   }).join("");
   // Poblar filtro de clientes en dashboard
   const filtroEl = document.getElementById('filtro-dash-cli');
@@ -2320,7 +2330,7 @@ function renderDash(){
 /* CLIENTES */
 function renderCli(){
   document.getElementById("cli-table").innerHTML=clientes.map((c,i)=>{
-    const s=getSaldo(c.nombre);
+    const s=getSaldoMostrado(c.nombre);
     return '<tr><td style="font-weight:500">'+c.nombre+'</td><td style="font-size:12px;color:#6b7694">'+c.ruc+'</td><td style="font-size:12px">'+c.tel+'</td><td style="font-size:12px;color:#185FA5">'+(c.correo||"—")+'</td><td><span class="badge '+(s>20?"badge-ok":s>0?"badge-pending":"badge-red")+'">'+s+' almuerzos</span></td><td><button class="btn btn-ghost btn-sm" onclick="abrirModal('+i+')"><i class="ti ti-edit"></i></button></td></tr>';
   }).join("");
 }
