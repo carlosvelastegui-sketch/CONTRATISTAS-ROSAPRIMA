@@ -941,7 +941,7 @@ function recalcCons(){
   });
   const lineas=getLineas();
   const n=document.getElementById("c-cliente").value;
-  const saldo=n?getSaldo(n):0;
+  const saldo=n?getSaldoMostrado(n):0;
   const total=lineas.reduce((a,l)=>a+l.qty,0);
   const tras=saldo-total;
   const r=document.getElementById("resumen-consumo");
@@ -957,7 +957,7 @@ async function registrarConsumo(){
   const lineas=getLineas();
   if(!lineas.length){alert("Agrega al menos una finca");return;}
   const total=lineas.reduce((a,l)=>a+l.qty,0);
-  const saldo=getSaldo(n);
+  const saldo=getSaldoMostrado(n);
   if(total>saldo&&!confirm("⚠ Saldo insuficiente\nSaldo: "+saldo+" · Consumiendo: "+total+"\n\n¿Registrar de todas formas?")) return;
   const fecha=document.getElementById("c-fecha").value;
   const obs=document.getElementById("c-obs").value;
@@ -976,7 +976,7 @@ async function registrarConsumo(){
     }
     guardarLocalStorage();
     mostrarSaldo();
-    alert("✓ Consumo registrado\n"+n+"\nTotal: "+total+" almuerzos\nSaldo restante: "+getSaldo(n));
+    alert("✓ Consumo registrado\n"+n+"\nTotal: "+total+" almuerzos\nSaldo restante: "+getSaldoMostrado(n));
     limpiarConsumo();
   } catch(err) {
     console.error('Error al guardar consumo:', err);
