@@ -877,7 +877,12 @@ function mostrarSaldo(){
   const n=document.getElementById("c-cliente").value;
   const d=document.getElementById("saldo-display");
   if(!n){d.style.display="none";return;}
-  const s=getSaldo(n);
+  // Mismo número que Estado de cuenta y Petición a facturar: si el cliente
+  // tiene una prefactura pendiente, el disponible real por FIFO (no el saldo
+  // histórico simple). getSaldoMostrado está definida más abajo en el
+  // archivo, pero JS permite llamarla aquí porque las funciones se "elevan"
+  // (hoisting) antes de ejecutarse.
+  const s=getSaldoMostrado(n);
   const acr=prefacturas.filter(p=>p.cliente===n).reduce((a,p)=>a+p.qty,0);
   const con=consumos.filter(c=>c.cliente===n).reduce((a,c)=>a+c.qty,0);
   const cls=s>20?"saldo-ok":s>0?"saldo-low":"saldo-zero";
