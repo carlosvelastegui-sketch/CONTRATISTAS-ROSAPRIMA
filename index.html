@@ -2431,11 +2431,9 @@ function renderFincas(){
   document.getElementById("fincas-grid").innerHTML = FINCAS.map(f=>{
     const bg = FC[f]||"#E6F1FB", tx = FT[f]||"#185FA5";
     const nombre = (FINCAS_META[f]&&FINCAS_META[f].nombre) ? FINCAS_META[f].nombre : "";
-    const usos = contarUsosFinca(f);
     return '<div style="border:1px solid #e2e6ed;border-radius:10px;padding:14px;position:relative">'
       + '<span style="display:inline-block;background:'+bg+';color:'+tx+';padding:3px 12px;border-radius:20px;font-size:13px;font-weight:700">'+f+'</span>'
       + '<div style="font-size:12px;color:#6b7694;margin-top:8px;min-height:16px">'+(nombre||"—")+'</div>'
-      + '<div style="font-size:11px;color:#6b7694;margin-top:6px">'+usos+' registro'+(usos===1?'':'s')+' de consumo</div>'
       + '<button class="btn btn-ghost btn-sm" onclick="eliminarFinca(\''+f+'\')" style="position:absolute;top:10px;right:10px" title="Eliminar finca"><i class="ti ti-trash" style="color:#A32D2D"></i></button>'
       + '</div>';
   }).join("");
