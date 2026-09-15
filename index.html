@@ -149,6 +149,7 @@ tbody tr:hover td{background:#f8f9fb}
     <div class="nav-item" onclick="showTab('cuentas',this)"><i class="ti ti-wallet"></i> Estado de cuentas</div>
     <div class="nav-item" onclick="showTab('reportes',this)"><i class="ti ti-chart-bar"></i> Reportes</div>
     <div class="nav-item" onclick="showTab('clientes',this)"><i class="ti ti-users"></i> Contratistas</div>
+    <div class="nav-item" onclick="showTab('fincas',this)"><i class="ti ti-map-2"></i> Fincas</div>
     <div class="sidebar-footer">
       <p><strong>Elaborado por:</strong><br>Ing. Carlos Velástegui<br>Administrador · Hanaska</p>
     </div>
@@ -483,6 +484,21 @@ tbody tr:hover td{background:#f8f9fb}
         </div>
       </div>
 
+      <!-- FINCAS -->
+      <div class="tab-content" id="tab-fincas">
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">Fincas registradas</span>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalFinca()"><i class="ti ti-plus"></i> Nueva finca</button>
+          </div>
+          <div id="fincas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px"></div>
+          <div style="font-size:11px;color:#6b7694;margin-top:16px;padding-top:14px;border-top:1px solid #f0f2f5">
+            <i class="ti ti-info-circle" style="vertical-align:-2px"></i>
+            Las fincas que agregues aquí aparecen automáticamente en Consumo diario, el filtro de Reportes, y en las columnas de Prefactura (vista previa, PDF y Excel).
+          </div>
+        </div>
+      </div>
+
     </div><!-- /content -->
   </div><!-- /main -->
 </div><!-- /app -->
@@ -505,6 +521,33 @@ tbody tr:hover td{background:#f8f9fb}
     <div class="actions">
       <button class="btn btn-primary" onclick="guardarCli()"><i class="ti ti-check"></i> Guardar</button>
       <button class="btn" onclick="cerrarModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FINCA -->
+<div class="modal-overlay" id="modal-finca">
+  <div class="modal" style="width:420px">
+    <div class="modal-title" id="modal-finca-title">Nueva finca</div>
+    <div class="form-row">
+      <div class="form-group"><label>Código</label><input id="mf-codigo" type="text" placeholder="Ej: R8" style="text-transform:uppercase"></div>
+      <div class="form-group"><label>Color</label>
+        <select id="mf-color">
+          <option value="#E6F1FB|#185FA5">Azul</option>
+          <option value="#EAF3DE|#3B6D11">Verde</option>
+          <option value="#FAEEDA|#854F0B">Ámbar</option>
+          <option value="#F3E8FB|#6B3FA0">Morado</option>
+          <option value="#FCEBEB|#A32D2D">Rojo</option>
+          <option value="#E8F8EF|#1a7a4a">Turquesa</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group" style="grid-column:1/-1"><label>Nombre / referencia (opcional)</label><input id="mf-nombre" type="text" placeholder="Ej: Finca Los Álamos"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="guardarFinca()"><i class="ti ti-check"></i> Guardar finca</button>
+      <button class="btn" onclick="cerrarModalFinca()">Cancelar</button>
     </div>
   </div>
 </div>
@@ -603,9 +646,10 @@ const PRECIOS_SERVICIOS = {
   "Refrigerio 2 Vianda":        {neto: 0.3565, iva: 0.0535,  total: 0.41}
 };
 const PRECIO = 1.7217; // Almuerzo Operativo (default)
-const FINCAS = ["R1","R2","R3","R4","R5","R6"];
-const FC = {R1:"#E6F1FB",R2:"#EAF3DE",R3:"#FAEEDA",R4:"#F3E8FB",R5:"#FCEBEB",R6:"#E8F8EF"};
-const FT = {R1:"#185FA5",R2:"#3B6D11",R3:"#854F0B",R4:"#6B3FA0",R5:"#A32D2D",R6:"#1a7a4a"};
+let FINCAS = ["R1","R2","R3","R4","R5","R6"];
+let FC = {R1:"#E6F1FB",R2:"#EAF3DE",R3:"#FAEEDA",R4:"#F3E8FB",R5:"#FCEBEB",R6:"#E8F8EF"};
+let FT = {R1:"#185FA5",R2:"#3B6D11",R3:"#854F0B",R4:"#6B3FA0",R5:"#A32D2D",R6:"#1a7a4a"};
+let FINCAS_META = {}; // {codigo: {nombre: '...'}}, solo para fincas agregadas desde la app
 const LOGO_B64 = "data:image/png;base64,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";
 
 const clientes = []; // datos vienen de Google Sheets
@@ -687,6 +731,25 @@ function cargarLocalStorage(){
     localStorage.setItem('rosaprima_version', APP_VERSION);
     console.log('✓ Cache local limpiado - datos vienen de Google Sheets');
   } catch(e){ console.error('cargarLocalStorage error:', e); }
+}
+
+// Las fincas creadas desde la app SÍ se conservan entre sesiones (no dependen del Sheet)
+function cargarFincasLocalStorage(){
+  try {
+    const raw = localStorage.getItem('rosaprima_fincas');
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d && Array.isArray(d.fincas)){
+      d.fincas.forEach(f=>{ if(!FINCAS.includes(f)) FINCAS.push(f); });
+      Object.assign(FC, d.fc||{});
+      Object.assign(FT, d.ft||{});
+      Object.assign(FINCAS_META, d.meta||{});
+    }
+  } catch(e){ console.error('cargarFincasLocalStorage error:', e); }
+}
+function guardarFincasLocalStorage(){
+  try { localStorage.setItem('rosaprima_fincas', JSON.stringify({fincas:FINCAS,fc:FC,ft:FT,meta:FINCAS_META})); }
+  catch(e){ console.error('guardarFincasLocalStorage error:', e); }
 }
 
 // ── API Google Sheets (JSONP — sin CORS) ──────────────────
@@ -863,13 +926,14 @@ function showTab(tab,el){
   document.querySelectorAll(".nav-item").forEach(n=>n.classList.remove("active"));
   document.getElementById("tab-"+tab).classList.add("active");
   el.classList.add("active");
-  const T={dashboard:"Dashboard",consumo:"Consumo diario",prefactura:"Prefactura",control:"Control de facturas",cuentas:"Estado de cuentas",reportes:"Reportes de consumo",clientes:"Contratistas"};
+  const T={dashboard:"Dashboard",consumo:"Consumo diario",prefactura:"Prefactura",control:"Control de facturas",cuentas:"Estado de cuentas",reportes:"Reportes de consumo",clientes:"Contratistas",fincas:"Fincas"};
   document.getElementById("page-title").textContent=T[tab];
   if(tab==="dashboard") renderDash();
   if(tab==="control") renderControl();
   if(tab==="cuentas") renderCuentas();
   if(tab==="reportes"){poblar();renderReporte();renderReportePagos();}
   if(tab==="clientes") renderCli();
+  if(tab==="fincas") renderFincas();
 }
 
 /* CONSUMO */
@@ -1683,12 +1747,7 @@ function generarPedido(){
           <th style="padding:8px 10px;text-align:left">Teléfono</th>
           <th style="padding:8px 10px;text-align:left">Correo</th>
           <th style="padding:8px 8px;text-align:center">Cant.</th>
-          <th style="padding:8px 6px;text-align:center">R1</th>
-          <th style="padding:8px 6px;text-align:center">R2</th>
-          <th style="padding:8px 6px;text-align:center">R3</th>
-          <th style="padding:8px 6px;text-align:center">R4</th>
-          <th style="padding:8px 6px;text-align:center">R5</th>
-          <th style="padding:8px 6px;text-align:center">R6</th>
+          ${FINCAS.map(f=>'<th style="padding:8px 6px;text-align:center">'+f+'</th>').join('')}
           <th style="padding:8px 10px;text-align:left">Servicio</th>
           <th style="padding:8px 10px;text-align:left">N° Comprobante</th>
           <th style="padding:8px 10px;text-align:left;white-space:nowrap">Fecha Registro</th>
@@ -1708,12 +1767,7 @@ function generarPedido(){
           <td style="padding:8px 10px;color:#6b7694">${r.cli.tel||'—'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.cli.correo||'—'}</td>
           <td style="padding:8px 10px;text-align:center;font-weight:700;color:#185FA5">${r.totalReal}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R1']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R2']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R3']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R4']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R5']||''}</td>
-          <td style="padding:8px 6px;text-align:center">${r.porFinca['R6']||''}</td>
+          ${FINCAS.map(f=>'<td style="padding:8px 6px;text-align:center">'+(r.porFinca[f]||'')+'</td>').join('')}
           <td style="padding:8px 10px">${r.f.servicio||'Almuerzo Operativo'}</td>
           <td style="padding:8px 10px;color:#6b7694">${r.f.comprobante||'—'}</td>
           <td style="padding:8px 10px;color:#6b7694;white-space:nowrap">${formatoNotasPedido(r.f.id).fechas}</td>
@@ -1726,7 +1780,7 @@ function generarPedido(){
       </tbody>
       <tfoot>
         <tr style="background:#0f1c3f;color:white;font-weight:700">
-          <td colspan="17" style="padding:10px 12px;text-align:right">TOTALES</td>
+          <td colspan="${11+FINCAS.length}" style="padding:10px 12px;text-align:right">TOTALES</td>
           <td style="padding:10px;text-align:right">${fmt(totales.sub)}</td>
           <td style="padding:10px;text-align:right">${fmt(totales.iva)}</td>
           <td style="padding:10px;text-align:right">${fmt(totales.tot)}</td>
@@ -1749,15 +1803,17 @@ function descargarPedidoExcel(){
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Pedido Facturación');
  ws.views = [{state: 'normal', showGridLines: false}];
-  ws.columns = [{width:24},{width:14},{width:14},{width:13},{width:22},{width:7},{width:6},{width:6},{width:6},{width:6},{width:6},{width:6},{width:20},{width:16},{width:14},{width:22},{width:10},{width:11},{width:10},{width:11}];
+  const totalCols = 14 + FINCAS.length;
+  const excelCol = n=>{ let s=''; while(n>0){ const m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; };
+  ws.columns = [{width:24},{width:14},{width:14},{width:13},{width:22},{width:7}, ...FINCAS.map(()=>({width:6})), {width:20},{width:16},{width:14},{width:22},{width:10},{width:11},{width:10},{width:11}];
   const AZUL_DARK='0F1C3F',AZUL_MED='185FA5',AZUL_LIGHT='E6F1FB',BLANCO='FFFFFF',GRIS_T='6B7694';
   const mkBorder=color=>({top:{style:'thin',color:{argb:'FF'+color}},bottom:{style:'thin',color:{argb:'FF'+color}},left:{style:'thin',color:{argb:'FF'+color}},right:{style:'thin',color:{argb:'FF'+color}}});
   // Fila 1 espaciado
   ws.addRow([]); ws.getRow(1).height=6;
   // Fila 2 título
   const r2=ws.addRow(['HANASKA (Rosaprima)  —  PEDIDO DE FACTURACIÓN']); r2.height=28;
-  ws.mergeCells('A2:T2');
-  for(let i=1;i<=20;i++){const cell=r2.getCell(i);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:14,bold:true,color:{argb:'FF'+BLANCO}};if(i===1)cell.alignment={horizontal:'left',vertical:'middle'};}
+  ws.mergeCells('A2:'+excelCol(totalCols)+'2');
+  for(let i=1;i<=totalCols;i++){const cell=r2.getCell(i);cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};cell.font={name:'Arial',size:14,bold:true,color:{argb:'FF'+BLANCO}};if(i===1)cell.alignment={horizontal:'left',vertical:'middle'};}
   // Fila 3 espaciado
   ws.addRow([]); ws.getRow(3).height=6;
   // Fila 4 fecha
@@ -1767,19 +1823,19 @@ function descargarPedidoExcel(){
   ws.getCell('B4').font={name:'Arial',size:10,color:{argb:'FF1A1A2E'}};
   // Fila 5 separador
   const r5=ws.addRow([]); r5.height=4;
-  for(let i=1;i<=20;i++) r5.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
+  for(let i=1;i<=totalCols;i++) r5.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
   // Fila 6 espaciado
   ws.addRow([]); ws.getRow(6).height=6;
   // Fila 7 headers
- const hdrs=['Razón Social','RUC','Dirección','Teléfono','Correo','Cant.','R1','R2','R3','R4','R5','R6','Servicio','Nº Comprobante','Fecha Registro','Nota / Observación','P. Neto','Subtotal','IVA 15%','Total'];
+ const hdrs=['Razón Social','RUC','Dirección','Teléfono','Correo','Cant.', ...FINCAS, 'Servicio','Nº Comprobante','Fecha Registro','Nota / Observación','P. Neto','Subtotal','IVA 15%','Total'];
   const r7=ws.addRow(hdrs); r7.height=22;
   r7.eachCell(cell=>{cell.font={name:'Arial',size:9,bold:true,color:{argb:'FF'+BLANCO}};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};cell.alignment={horizontal:'center',vertical:'middle',wrapText:true};cell.border=mkBorder('0D4E8A');});
   ws.getRow(7).getCell(1).alignment={horizontal:'left',vertical:'middle'};
   // Filas datos
-  const numCols=new Set([6,7,8,9,10,11,12,17,18,19,20]);
+  const numCols=new Set([6, ...FINCAS.map((_,i)=>7+i), ...[0,1,2,3].map(i=>totalCols-3+i)]);
   filas.forEach(r=>{
     const n=formatoNotasPedido(r.f.id);
-    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal,r.porFinca['R1']||'',r.porFinca['R2']||'',r.porFinca['R3']||'',r.porFinca['R4']||'',r.porFinca['R5']||'',r.porFinca['R6']||'',r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',n.fechas||'',n.notas||'',r.precioU,r.sub,r.iva,r.tot]);
+    const row=ws.addRow([r.f.cliente,r.cli.ruc||'',r.cli.dir||'',r.cli.tel||'',r.cli.correo||'',r.totalReal, ...FINCAS.map(f=>r.porFinca[f]||''), r.f.servicio||'Almuerzo Operativo',r.f.comprobante||'',n.fechas||'',n.notas||'',r.precioU,r.sub,r.iva,r.tot]);
     // Ajustar el alto de la fila según el largo del texto de fecha/nota,
     // para que ninguna de las dos quede cortada.
     const largoNota = (n.notas||'').length;
@@ -1791,28 +1847,28 @@ function descargarPedidoExcel(){
       cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_LIGHT}};
       cell.border=mkBorder('B5D4F4');
       cell.font={name:'Arial',size:9,color:{argb:'FF1A1A2E'}};
-      if(numCols.has(colNum)){cell.alignment={horizontal:colNum>=17?'right':'center',vertical:'middle'};if(colNum>=17)cell.numFmt='#,##0.0000';}
-      else if(colNum===15||colNum===16){cell.alignment={horizontal:'left',vertical:'middle',wrapText:true};}
+      if(numCols.has(colNum)){cell.alignment={horizontal:colNum>=totalCols-3?'right':'center',vertical:'middle'};if(colNum>=totalCols-3)cell.numFmt='#,##0.0000';}
+      else if(colNum===9+FINCAS.length||colNum===10+FINCAS.length){cell.alignment={horizontal:'left',vertical:'middle',wrapText:true};}
       else{cell.alignment={horizontal:'left',vertical:'middle'};}
     });
   });
   // Fila totales
   const lastRow=7+filas.length;
-  const totRow=ws.addRow(['TOTALES','','','','','','','','','','','','','','','','',totales.sub,totales.iva,totales.tot]);
+  const totRow=ws.addRow(['TOTALES', ...Array(totalCols-4).fill(''), totales.sub, totales.iva, totales.tot]);
 totRow.height=18;
-ws.mergeCells('A'+(lastRow+1)+':R'+(lastRow+1));
+ws.mergeCells('A'+(lastRow+1)+':'+excelCol(totalCols-2)+(lastRow+1));
 totRow.eachCell({includeEmpty:true},(cell,colNum)=>{
   cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_DARK}};
   cell.font={name:'Arial',size:9,bold:true,color:{argb:'FF'+BLANCO}};
   cell.border=mkBorder(AZUL_DARK);
-  if(colNum>=18) cell.numFmt='#,##0.0000';
+  if(colNum>=totalCols-2) cell.numFmt='#,##0.0000';
   cell.alignment={horizontal:'right',vertical:'middle'};
 });  // Separador inferior
   const rSep=ws.addRow([]); rSep.height=4;
-  for(let i=1;i<=20;i++) rSep.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
+  for(let i=1;i<=totalCols;i++) rSep.getCell(i).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF'+AZUL_MED}};
   // Pie
   const rPie=ws.addRow(['TECFOOD SERVICIOS DE ALIMENTACION S.A.  |  RUC: 1792065461001  |  Cayambe, Pichincha']); rPie.height=14;
-  ws.mergeCells('A'+(lastRow+3)+':T'+(lastRow+3));
+  ws.mergeCells('A'+(lastRow+3)+':'+excelCol(totalCols)+(lastRow+3));
   rPie.getCell(1).font={name:'Arial',size:8,italic:true,color:{argb:'FF'+GRIS_T}};
   rPie.getCell(1).alignment={horizontal:'center',vertical:'middle'};
   wb.xlsx.writeBuffer().then(buffer=>{
@@ -1853,12 +1909,7 @@ function descargarPedidoPDF(){
           <th style="padding:7px 6px;text-align:left">Teléfono</th>
           <th style="padding:7px 6px;text-align:left">Correo</th>
           <th style="padding:7px 6px;text-align:center">Cant.</th>
-          <th style="padding:7px 4px;text-align:center">R1</th>
-          <th style="padding:7px 4px;text-align:center">R2</th>
-          <th style="padding:7px 4px;text-align:center">R3</th>
-          <th style="padding:7px 4px;text-align:center">R4</th>
-          <th style="padding:7px 4px;text-align:center">R5</th>
-          <th style="padding:7px 4px;text-align:center">R6</th>
+          ${FINCAS.map(f=>'<th style="padding:7px 4px;text-align:center">'+f+'</th>').join('')}
           <th style="padding:7px 8px;text-align:left">Servicio</th>
           <th style="padding:7px 8px;text-align:left;white-space:nowrap">Fecha Registro</th>
           <th style="padding:7px 8px;text-align:left;min-width:140px">Nota / Observación</th>
@@ -1877,12 +1928,7 @@ function descargarPedidoPDF(){
           <td style="padding:7px 6px;color:#555">${r.cli.tel||'—'}</td>
           <td style="padding:7px 6px;color:#555">${r.cli.correo||'—'}</td>
           <td style="padding:7px 6px;text-align:center;font-weight:700;color:#185FA5">${r.totalReal}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R1']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R2']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R3']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R4']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R5']||''}</td>
-          <td style="padding:7px 4px;text-align:center">${r.porFinca['R6']||''}</td>
+          ${FINCAS.map(f=>'<td style="padding:7px 4px;text-align:center">'+(r.porFinca[f]||'')+'</td>').join('')}
           <td style="padding:7px 8px">${r.f.servicio||'Almuerzo Operativo'}</td>
           <td style="padding:7px 8px;color:#555;white-space:nowrap">${formatoNotasPedido(r.f.id).fechas}</td>
           <td style="padding:7px 8px;color:#555;white-space:normal;word-break:break-word;max-width:200px">${formatoNotasPedido(r.f.id).notas}</td>
@@ -1894,7 +1940,7 @@ function descargarPedidoPDF(){
       </tbody>
       <tfoot>
         <tr style="background:#0f1c3f;color:white;font-weight:700">
-          <td colspan="16" style="padding:8px 10px;text-align:right">TOTALES</td>
+          <td colspan="${10+FINCAS.length}" style="padding:8px 10px;text-align:right">TOTALES</td>
           <td style="padding:8px;text-align:right">${fmt(totales.sub)}</td>
           <td style="padding:8px;text-align:right">${fmt(totales.iva)}</td>
           <td style="padding:8px;text-align:right">${fmt(totales.tot)}</td>
@@ -2375,8 +2421,73 @@ async function guardarCli(){
 
 function cerrarModal(){document.getElementById("modal-cli").classList.remove("open");}
 
+/* FINCAS */
+function contarUsosFinca(codigo){
+  const a = consumos.filter(x=>x.finca===codigo).length;
+  const b = consumosHistoricos.filter(x=>x.finca===codigo).length;
+  return a+b;
+}
+function renderFincas(){
+  document.getElementById("fincas-grid").innerHTML = FINCAS.map(f=>{
+    const bg = FC[f]||"#E6F1FB", tx = FT[f]||"#185FA5";
+    const nombre = (FINCAS_META[f]&&FINCAS_META[f].nombre) ? FINCAS_META[f].nombre : "";
+    const usos = contarUsosFinca(f);
+    return '<div style="border:1px solid #e2e6ed;border-radius:10px;padding:14px;position:relative">'
+      + '<span style="display:inline-block;background:'+bg+';color:'+tx+';padding:3px 12px;border-radius:20px;font-size:13px;font-weight:700">'+f+'</span>'
+      + '<div style="font-size:12px;color:#6b7694;margin-top:8px;min-height:16px">'+(nombre||"—")+'</div>'
+      + '<div style="font-size:11px;color:#6b7694;margin-top:6px">'+usos+' registro'+(usos===1?'':'s')+' de consumo</div>'
+      + '<button class="btn btn-ghost btn-sm" onclick="eliminarFinca(\''+f+'\')" style="position:absolute;top:10px;right:10px" title="Eliminar finca"><i class="ti ti-trash" style="color:#A32D2D"></i></button>'
+      + '</div>';
+  }).join("");
+}
+function abrirModalFinca(){
+  document.getElementById("modal-finca-title").textContent="Nueva finca";
+  document.getElementById("mf-codigo").value="";
+  document.getElementById("mf-nombre").value="";
+  document.getElementById("mf-color").selectedIndex=0;
+  document.getElementById("modal-finca").classList.add("open");
+}
+function cerrarModalFinca(){document.getElementById("modal-finca").classList.remove("open");}
+function guardarFinca(){
+  let cod = document.getElementById("mf-codigo").value.trim().toUpperCase();
+  if(!cod){alert("El código de la finca es obligatorio");return;}
+  if(FINCAS.includes(cod)){alert("Ya existe una finca con ese código");return;}
+  const nombre = document.getElementById("mf-nombre").value.trim();
+  const [bg,tx] = document.getElementById("mf-color").value.split("|");
+  FINCAS.push(cod);
+  FC[cod]=bg; FT[cod]=tx;
+  if(nombre) FINCAS_META[cod]={nombre:nombre};
+  guardarFincasLocalStorage();
+  refrescarSelectFincas();
+  cerrarModalFinca();
+  renderFincas();
+}
+function eliminarFinca(codigo){
+  const usos = contarUsosFinca(codigo);
+  const msg = usos>0
+    ? "La finca "+codigo+" tiene "+usos+" registro(s) de consumo asociados. Se eliminará solo de la lista de fincas disponibles; los registros históricos no se borran. ¿Continuar?"
+    : "¿Eliminar la finca "+codigo+"?";
+  if(!confirm(msg)) return;
+  FINCAS = FINCAS.filter(f=>f!==codigo);
+  delete FC[codigo]; delete FT[codigo]; delete FINCAS_META[codigo];
+  guardarFincasLocalStorage();
+  refrescarSelectFincas();
+  renderFincas();
+}
+// Reconstruye los <select> que dependen de la lista de fincas (filtro de reportes)
+function refrescarSelectFincas(){
+  const s = document.getElementById("rpt-finca");
+  if(s){
+    const v = s.value;
+    s.innerHTML = '<option value="">Todas</option>' + FINCAS.map(f=>'<option>'+f+'</option>').join("");
+    if(FINCAS.includes(v)) s.value = v;
+  }
+}
+
+cargarFincasLocalStorage();
 poblar(); calcPF(); agregarLinea();
 cargarLocalStorage();
+refrescarSelectFincas();
 showTab('dashboard', document.querySelector('.nav-item'));
 renderDash();
 cargarDatosCloud().then(function(){ poblar(); renderDash(); renderControl(); });
